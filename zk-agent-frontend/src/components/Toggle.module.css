@@ -1,0 +1,31 @@
+.track {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 17px;
+  border-radius: 9px;
+  background: var(--border-primary);
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.track[data-on="true"] {
+  background: var(--brand-700);
+}
+
+.knob {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+  pointer-events: none;
+}
+
+.track[data-on="true"] .knob {
+  transform: translateX(13px);
+}

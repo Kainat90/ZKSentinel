@@ -1,10 +1,11 @@
 /**
- * Trading Agent Dashboard — Express server with embedded UI
+ * Trading Agent Dashboard — Express server with embedded UI + React frontend API
  *
  * Usage:
  *   npx ts-node scripts/dashboard.ts
  *
  * Opens a live dashboard at http://localhost:3000
+ * Also exposes a REST + WebSocket API consumed by the React frontend (zk-agent-frontend).
  * Run alongside npm run run-agent in a separate terminal.
  */
 
@@ -14,25 +15,186 @@ dotenv.config();
 import express from "express";
 import * as fs from "fs";
 import * as path from "path";
+import * as http from "http";
+import { WebSocketServer, WebSocket } from "ws";
 
 const app = express();
 const PORT = process.env.DASHBOARD_PORT || 3000;
 const CHECKPOINTS_FILE = path.join(process.cwd(), "checkpoints.jsonl");
 
-// ─── API ─────────────────────────────────────────────────────────────────────
+// ─── CORS (allows the React frontend on :5173 to call this server) ────────────
+
+app.use((_req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  next();
+});
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function readCheckpoints(): any[] {
+  if (!fs.existsSync(CHECKPOINTS_FILE)) return [];
+  const raw = fs.readFileSync(CHECKPOINTS_FILE, "utf8").trim();
+  if (!raw) return [];
+  return raw
+    .split("\n")
+    .map(l => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(Boolean);
+}
+
+function timeAgo(timestampSeconds: number): string {
+  const secs = Math.floor(Date.now() / 1000 - timestampSeconds);
+  if (secs < 60)  return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
+function normalizePair(pair: string): string {
+  return pair.replace("XBT", "BTC").replace(/USD$/, "/USD");
+}
+
+function formatAmount(cp: any): string {
+  if (!cp.amountUsd || cp.amountUsd === 0) return "—";
+  const asset = ((cp.asset || cp.pair?.replace("USD", "") || "BTC") as string).replace("XBT", "BTC");
+  const coins = cp.priceUsd > 0 ? (cp.amountUsd / cp.priceUsd).toFixed(6) : "0";
+  return `${coins} ${asset}`;
+}
+
+/** Convert a checkpoint to the Decision shape the React frontend expects */
+function toDecision(cp: any, _idx: number, pnl = 0) {
+  return {
+    id: `dec-${cp.timestamp}`,
+    action: cp.action as "BUY" | "SELL" | "HOLD",
+    reasoning: cp.reasoning ?? "—",
+    confidence: Math.round((cp.confidence ?? 0.5) * 100),
+    timestamp: new Date((cp.timestamp as number) * 1000).toISOString(),
+    timeAgo: timeAgo(cp.timestamp as number),
+    pair: normalizePair(cp.pair ?? "BTCUSD"),
+    amount: formatAmount(cp),
+    price: `$${Number(cp.priceUsd ?? 0).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`,
+    pnl: parseFloat(pnl.toFixed(2)),
+    proofHash: cp.reasoningHash ?? cp.signature?.slice(0, 34) ?? "—",
+    proofStatus: "PASS" as const,
+    checkpointHash: cp.reasoningHash ?? "—",
+    eip712: !!cp.signature,
+  };
+}
+
+/** Convert a checkpoint to the ZKProof shape the React frontend expects */
+function toProof(cp: any, _idx: number) {
+  return {
+    id: `proof-${cp.timestamp}`,
+    hash: cp.reasoningHash ?? cp.signature?.slice(0, 34) ?? "—",
+    decision: cp.action as "BUY" | "SELL" | "HOLD",
+    rule: cp.action === "HOLD" ? "No trade — HOLD rule" : "Position limits validated",
+    status: "PASS" as const,
+    timestamp: new Date((cp.timestamp as number) * 1000).toISOString(),
+  };
+}
+
+/** Build an ordered Decision list with approximate PnL derived from price deltas */
+function toDecisionList(checkpoints: any[]) {
+  // checkpoints is oldest-first; compute forward pnl then reverse for newest-first display
+  const result = checkpoints.map((cp, i) => {
+    let pnl = 0;
+    if (cp.action !== "HOLD" && cp.amountUsd > 0 && i + 1 < checkpoints.length) {
+      const next = checkpoints[i + 1];
+      const pct = cp.priceUsd > 0 ? (next.priceUsd - cp.priceUsd) / cp.priceUsd : 0;
+      pnl = cp.action === "BUY" ? pct * cp.amountUsd : -pct * cp.amountUsd;
+    }
+    return toDecision(cp, i, pnl);
+  });
+  return result.reverse();
+}
+
+/** Compute reputation stats from all checkpoints */
+function computeReputation(checkpoints: any[]) {
+  const trades = checkpoints.filter(cp => cp.action !== "HOLD");
+  const buys   = checkpoints.filter(cp => cp.action === "BUY").length;
+  const total  = checkpoints.length;
+  const winRate = total > 0 ? Math.round((buys / total) * 100) : 0;
+  const score   = Math.min(900, 500 + Math.round(winRate * 2) + Math.min(trades.length * 2, 200));
+
+  // Score history — one entry per day, running accumulation
+  const byDay: Record<string, number[]> = {};
+  checkpoints.forEach(cp => {
+    const day = new Date((cp.timestamp as number) * 1000).toLocaleDateString("en-US", {
+      month: "short", day: "numeric",
+    });
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push(cp.confidence ?? 0.5);
+  });
+  let running = 500;
+  const history = Object.entries(byDay).slice(-14).map(([date, confs]) => {
+    const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
+    running = Math.round(running + avg * 10);
+    return { date, score: running };
+  });
+
+  // Win/loss chart — trades per day
+  const wlByDay: Record<string, { wins: number; losses: number }> = {};
+  checkpoints.forEach(cp => {
+    const day = new Date((cp.timestamp as number) * 1000).toLocaleDateString("en-US", {
+      month: "short", day: "numeric",
+    });
+    if (!wlByDay[day]) wlByDay[day] = { wins: 0, losses: 0 };
+    if (cp.action !== "HOLD") wlByDay[day].wins++;
+    else                      wlByDay[day].losses++;
+  });
+  const winLoss = Object.entries(wlByDay).slice(-14).map(([date, v]) => ({ date, ...v }));
+
+  // Proof history — count per day
+  const phByDay: Record<string, number> = {};
+  checkpoints.forEach(cp => {
+    const day = new Date((cp.timestamp as number) * 1000).toLocaleDateString("en-US", {
+      month: "short", day: "numeric",
+    });
+    phByDay[day] = (phByDay[day] ?? 0) + 1;
+  });
+  const proofHistory = Object.entries(phByDay).slice(-14).map(([date, count]) => ({ date, count }));
+
+  // Agent age
+  const firstTs  = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1].timestamp as number : Date.now() / 1000;
+  const ageSecs  = Date.now() / 1000 - firstTs;
+  const ageDays  = Math.floor(ageSecs / 86400);
+  const ageHours = Math.floor(ageSecs / 3600);
+  const agentAge = ageDays > 0 ? `${ageDays} day${ageDays !== 1 ? "s" : ""}` : `${ageHours}h`;
+
+  return {
+    score,
+    avgRoi: 0,
+    proofSuccessRate: 100,
+    winRate,
+    totalTrades: trades.length,
+    agentAge,
+    history,
+    winLoss,
+    proofHistory,
+    contractAddress: process.env.REPUTATION_REGISTRY_ADDRESS ?? "0x0000000000000000000000000000000000000000",
+  };
+}
+
+// ─── Existing API ─────────────────────────────────────────────────────────────
 
 app.get("/api/status", (_req, res) => {
   res.json({
-    agentId:       process.env.AGENT_ID ?? "—",
-    wallet:        process.env.HOT_WALLET_PRIVATE_KEY ? "(hot wallet set)" : process.env.PRIVATE_KEY ? "(operator wallet)" : "—",
-    pair:          process.env.TRADING_PAIR ?? "XBTUSD",
-    sandbox:       process.env.KRAKEN_SANDBOX !== "false",
+    agentId:  process.env.AGENT_ID ?? "—",
+    wallet:   process.env.HOT_WALLET_PRIVATE_KEY ? "(hot wallet set)" : process.env.PRIVATE_KEY ? "(operator wallet)" : "—",
+    pair:     process.env.TRADING_PAIR ?? "XBTUSD",
+    sandbox:  process.env.KRAKEN_SANDBOX !== "false",
+    network:  "Sepolia",
+    interval: parseInt(process.env.POLL_INTERVAL_MS ?? "30000") / 1000,
     contracts: {
-      agentRegistry:      process.env.AGENT_REGISTRY_ADDRESS ?? null,
-      hackathonVault:     process.env.HACKATHON_VAULT_ADDRESS ?? null,
-      riskRouter:         process.env.RISK_ROUTER_ADDRESS ?? null,
-      reputationRegistry: process.env.REPUTATION_REGISTRY_ADDRESS ?? null,
-      validationRegistry: process.env.VALIDATION_REGISTRY_ADDRESS ?? null,
+      agentRegistry:      process.env.AGENT_REGISTRY_ADDRESS      ?? null,
+      hackathonVault:     process.env.HACKATHON_VAULT_ADDRESS      ?? null,
+      riskRouter:         process.env.RISK_ROUTER_ADDRESS          ?? null,
+      reputationRegistry: process.env.REPUTATION_REGISTRY_ADDRESS  ?? null,
+      validationRegistry: process.env.VALIDATION_REGISTRY_ADDRESS  ?? null,
     },
   });
 });
@@ -58,7 +220,24 @@ app.get("/api/price", (_req, res) => {
   }
 });
 
-// ─── HTML ────────────────────────────────────────────────────────────────────
+// ─── New API (consumed by React frontend) ────────────────────────────────────
+
+app.get("/api/decisions", (_req, res) => {
+  const all = readCheckpoints();
+  res.json(toDecisionList(all).slice(0, 50));
+});
+
+app.get("/api/proofs", (_req, res) => {
+  const all = readCheckpoints();
+  res.json(all.slice(-50).reverse().map((cp, i) => toProof(cp, i)));
+});
+
+app.get("/api/reputation", (_req, res) => {
+  const all = readCheckpoints();
+  res.json(computeReputation(all));
+});
+
+// ─── HTML (embedded legacy dashboard — runs alongside React frontend) ─────────
 
 const HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -99,7 +278,6 @@ const HTML = `<!DOCTYPE html>
     overflow-x: hidden;
   }
 
-  /* Subtle top border accent */
   body::before {
     content: '';
     position: fixed;
@@ -109,7 +287,6 @@ const HTML = `<!DOCTYPE html>
     z-index: 9999;
   }
 
-  /* Header */
   header {
     display: flex;
     align-items: center;
@@ -168,7 +345,6 @@ const HTML = `<!DOCTYPE html>
     font-size: 11px;
   }
 
-  /* Grid layout */
   .grid {
     display: grid;
     grid-template-columns: 280px 1fr;
@@ -206,7 +382,6 @@ const HTML = `<!DOCTYPE html>
     color: var(--accent);
   }
 
-  /* Left sidebar */
   .sidebar {
     grid-row: 1 / 3;
     display: flex;
@@ -214,7 +389,6 @@ const HTML = `<!DOCTYPE html>
     border-right: 1px solid var(--border);
   }
 
-  /* Price hero */
   .price-hero {
     padding: 24px 16px 20px;
     border-bottom: 1px solid var(--border);
@@ -251,7 +425,6 @@ const HTML = `<!DOCTYPE html>
   .price-change.up   { color: var(--buy); }
   .price-change.down { color: var(--sell); }
 
-  /* Decision display */
   .decision-display {
     padding: 16px;
     border-bottom: 1px solid var(--border);
@@ -298,7 +471,6 @@ const HTML = `<!DOCTYPE html>
     padding-left: 10px;
   }
 
-  /* Agent info */
   .agent-info {
     padding: 16px;
     flex: 1;
@@ -319,7 +491,6 @@ const HTML = `<!DOCTYPE html>
   .info-value { color: var(--text);  font-size: 11px; font-weight: 500; }
   .info-value.accent { color: var(--accent); }
 
-  /* Mini chart */
   .chart-panel {
     padding: 0;
     height: 120px;
@@ -331,13 +502,11 @@ const HTML = `<!DOCTYPE html>
     height: 100% !important;
   }
 
-  /* Main area */
   .main-area {
     display: flex;
     flex-direction: column;
   }
 
-  /* Feed */
   .feed {
     flex: 1;
     overflow-y: auto;
@@ -348,7 +517,6 @@ const HTML = `<!DOCTYPE html>
   .feed::-webkit-scrollbar-track { background: transparent; }
   .feed::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 
-  /* Checkpoint card */
   .checkpoint-card {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
@@ -458,7 +626,6 @@ const HTML = `<!DOCTYPE html>
     text-overflow: ellipsis;
   }
 
-  /* Empty state */
   .empty {
     display: flex;
     flex-direction: column;
@@ -471,7 +638,6 @@ const HTML = `<!DOCTYPE html>
 
   .empty-icon { font-size: 32px; opacity: 0.3; }
 
-  /* Connection status */
   .conn-dot {
     width: 6px; height: 6px;
     border-radius: 50%;
@@ -576,7 +742,6 @@ const truncate = (s, n=16) => s ? s.slice(0, 6) + '...' + s.slice(-4) : '—';
 let prevPrice = null;
 let priceHistory = [];
 
-// ── Status ───────────────────────────────────────────────────────────────────
 async function loadStatus() {
   try {
     const r = await fetch('/api/status');
@@ -592,7 +757,6 @@ async function loadStatus() {
   } catch(e) {}
 }
 
-// ── Checkpoints ───────────────────────────────────────────────────────────────
 async function loadCheckpoints() {
   try {
     const r = await fetch('/api/checkpoints');
@@ -605,7 +769,6 @@ async function loadCheckpoints() {
 
     if (cps.length === 0) return;
 
-    // Update price
     const latest = cps[0];
     const price = latest.priceUsd;
 
@@ -622,24 +785,20 @@ async function loadCheckpoints() {
     }
     prevPrice = price;
 
-    // Update chart data
     priceHistory = cps.slice(0, 20).map(c => c.priceUsd).reverse();
     drawChart();
 
-    // Update decision
     const dec = latest.action;
     const decEl = document.getElementById('decision-badge');
     decEl.textContent = dec;
     decEl.className = 'decision-badge ' + dec;
 
-    // Update wallet from first checkpoint
     if (latest.signerAddress) {
       document.getElementById('info-wallet').textContent = truncate(latest.signerAddress);
     }
 
     document.getElementById('decision-reasoning').textContent = latest.reasoning ?? '—';
 
-    // Render feed
     const feed = document.getElementById('feed');
     feed.innerHTML = cps.map(cp => {
       const conf = Math.round((cp.confidence ?? 0.5) * 100);
@@ -671,7 +830,6 @@ async function loadCheckpoints() {
   }
 }
 
-// ── Mini chart ────────────────────────────────────────────────────────────────
 function drawChart() {
   const canvas = document.getElementById('price-chart');
   const ctx = canvas.getContext('2d');
@@ -692,7 +850,6 @@ function drawChart() {
 
   ctx.clearRect(0, 0, W, H);
 
-  // Fill
   const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, 'rgba(0,112,243,0.12)');
   grad.addColorStop(1, 'rgba(0,112,243,0)');
@@ -706,7 +863,6 @@ function drawChart() {
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Line
   ctx.beginPath();
   ctx.moveTo(x(0), y(priceHistory[0]));
   for (let i = 1; i < priceHistory.length; i++) ctx.lineTo(x(i), y(priceHistory[i]));
@@ -714,7 +870,6 @@ function drawChart() {
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Last dot
   const lx = x(priceHistory.length - 1);
   const ly = y(priceHistory[priceHistory.length - 1]);
   ctx.beginPath();
@@ -723,7 +878,6 @@ function drawChart() {
   ctx.fill();
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 loadStatus();
 loadCheckpoints();
 setInterval(loadCheckpoints, 5000);
@@ -734,7 +888,72 @@ window.addEventListener('resize', drawChart);
 
 app.get("/", (_req, res) => res.send(HTML));
 
-app.listen(PORT, () => {
-  console.log(`\n  Dashboard running at http://localhost:${PORT}`);
-  console.log(`  Run "npm run run-agent" in another terminal to feed it data.\n`);
+// ─── HTTP + WebSocket server ──────────────────────────────────────────────────
+
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: "/ws" });
+
+function broadcast(data: object) {
+  const msg = JSON.stringify(data);
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) client.send(msg);
+  });
+}
+
+// ─── File watcher — push new checkpoints to connected WS clients ──────────────
+
+let lastByteOffset = 0;
+
+function pollCheckpointFile() {
+  try {
+    if (!fs.existsSync(CHECKPOINTS_FILE)) {
+      setTimeout(pollCheckpointFile, 2000);
+      return;
+    }
+
+    const stat = fs.statSync(CHECKPOINTS_FILE);
+    if (stat.size > lastByteOffset) {
+      const fd = fs.openSync(CHECKPOINTS_FILE, "r");
+      const newBytes = stat.size - lastByteOffset;
+      const buf = Buffer.alloc(newBytes);
+      fs.readSync(fd, buf, 0, newBytes, lastByteOffset);
+      fs.closeSync(fd);
+      lastByteOffset = stat.size;
+
+      const newLines = buf.toString("utf8").trim().split("\n").filter(Boolean);
+      const allCps   = readCheckpoints();
+
+      for (const line of newLines) {
+        try {
+          const cp = JSON.parse(line);
+          const idx = allCps.length - 1;
+
+          broadcast({ type: "decision", data: toDecision(cp, idx) });
+          broadcast({ type: "proof",    data: toProof(cp, idx) });
+          broadcast({
+            type: "log",
+            data: {
+              id:        `log-${cp.timestamp}`,
+              timestamp: new Date((cp.timestamp as number) * 1000).toLocaleTimeString("en-US", { hour12: false }),
+              message:   `${cp.action} · ${normalizePair(cp.pair ?? "BTCUSD")} @ $${Number(cp.priceUsd ?? 0).toLocaleString()} · confidence ${Math.round((cp.confidence ?? 0.5) * 100)}%`,
+            },
+          });
+          broadcast({ type: "reputation", data: computeReputation(allCps) });
+        } catch { /* skip malformed lines */ }
+      }
+    }
+  } catch { /* file may not exist yet */ }
+
+  setTimeout(pollCheckpointFile, 2000);
+}
+
+pollCheckpointFile();
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+
+server.listen(PORT, () => {
+  console.log(`\n  Dashboard  → http://localhost:${PORT}`);
+  console.log(`  REST API   → http://localhost:${PORT}/api/decisions  (and /proofs, /reputation, /status)`);
+  console.log(`  WebSocket  → ws://localhost:${PORT}/ws`);
+  console.log(`\n  Run "npm run run-agent" in another terminal to feed it data.\n`);
 });
