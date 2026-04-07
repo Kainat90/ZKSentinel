@@ -45,12 +45,12 @@ async function main() {
 
   // Register agent (mints ERC-721)
   const agentId = await getAgentId(operatorSigner, registryAddress, {
-    name: "HackathonTradingAgent",
-    description: "Autonomous AI trading agent with ERC-8004 identity, Kraken CLI execution, and EIP-712 checkpoints",
+    name: "ZKSentinel",
+    description: "Autonomous AI trading agent with ERC-8004 identity, coingecko integration , and EIP-712 checkpoints",
     capabilities: ["trading", "analysis", "explainability", "eip712-signing"],
     agentWallet: agentWallet.address,
     agentURI: `data:application/json,${encodeURIComponent(JSON.stringify({
-      name: "HackathonTradingAgent",
+      name: "ZKSentinel",
       version: "1.0.0",
       agentWallet: agentWallet.address,
       capabilities: ["trading", "analysis", "eip712-signing"],
@@ -65,23 +65,7 @@ async function main() {
     console.log(`  AGENT_WALLET_PRIVATE_KEY=${agentWalletKey}`);
   }
 
-  // Optionally configure risk params
-  if (routerAddress) {
-    const RISK_ROUTER_ABI = [
-      "function setRiskParams(uint256 agentId, uint256 maxPositionUsdScaled, uint256 maxDrawdownBps, uint256 maxTradesPerHour) external",
-    ];
-    const router = new ethers.Contract(routerAddress, RISK_ROUTER_ABI, operatorSigner);
 
-    console.log(`\nSetting default risk params on RiskRouter...`);
-    const tx = await router.setRiskParams(
-      agentId,
-      BigInt(50000),  // maxPositionUsdScaled: $500 max per trade (500 * 100)
-      BigInt(500),    // maxDrawdownBps: 5%
-      BigInt(10)      // maxTradesPerHour: 10
-    );
-    await tx.wait();
-    console.log(`Risk params set: maxPosition=$500, maxDrawdown=5%, maxTrades/hr=10`);
-  }
 }
 
 main().catch((err) => {

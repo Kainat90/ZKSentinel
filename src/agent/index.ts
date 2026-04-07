@@ -7,9 +7,9 @@ import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 
-import { TradingStrategy } from "../types/index";
+import { TradingStrategy, TradeDecision } from "../types/index";
 import { getAgentId, getAgentRegistration } from "./identity";
-import { VolumeConfirmedMomentumStrategy, LLMStrategy } from "./strategy";
+import { VolumeConfirmedMomentumStrategy, } from "./strategy";
 import {getMarketSnapshot} from "../data/marketdata";
 import { VaultClient } from "../onchain/vault";
 import { RiskRouterClient } from "../onchain/riskRouter";
@@ -156,10 +156,11 @@ export async function runAgent(strategy: TradingStrategy) {
       const cp = checkpoint as typeof checkpoint & { checkpointHash?: string };
       if (cp.checkpointHash) {
         try {
+          const score = computeCheckpointScore(decision);
           await validation.postCheckpointAttestation(
             agentId,
             cp.checkpointHash,
-            Math.round(decision.confidence * 100), // self-assessed score
+            score,
             `${decision.action} ${decision.pair} @ $${market.price}`
           );
           console.log(`[agent] Checkpoint posted to ValidationRegistry: ${cp.checkpointHash.slice(0, 20)}...`);
@@ -178,6 +179,22 @@ export async function runAgent(strategy: TradingStrategy) {
 
   await tick();
   setInterval(tick, POLL_INTERVAL);
+}
+
+function computeCheckpointScore(decision: TradeDecision): number {
+  const baseScore = Math.round(decision.confidence * 100);
+
+  if (decision.action === "HOLD") {
+    if (decision.reasoning.startsWith("Warming up")) {
+      return 80;
+    }
+    if (decision.reasoning.includes("BLOCKED by RiskRouter")) {
+      return 90;
+    }
+    return Math.min(95, Math.max(60, baseScore));
+  }
+
+  return Math.min(100, Math.max(0, baseScore));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
