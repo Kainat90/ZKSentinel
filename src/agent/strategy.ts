@@ -31,7 +31,7 @@ export class VolumeConfirmedMomentumStrategy implements TradingStrategy {
   private readonly OBV_SMA_PERIOD  = 10;
   private readonly EMA_PERIOD      = 9;
   private readonly tradeAmountUsd  = 490;
-
+private readonly MAX_VOLATILITY_PCT = 3.0;
   private readonly MIN_VOLUME_RATIO = 1.5;   // FIX 1: raised from 1.15 → 1.5
   private readonly MIN_EMA_DELTA    = 0.12;
 
@@ -115,6 +115,25 @@ export class VolumeConfirmedMomentumStrategy implements TradingStrategy {
     // ─────────────────────────────
     // FIX 8: Circuit breaker guard — halt all trading
     // ─────────────────────────────
+
+    // Volatility check to prevent trading during extreme market conditions
+    // Volatility guard — skip new entries during extreme price swings
+if (this.priceHistory.length >= 2) {
+  const recentHigh = Math.max(...this.priceHistory);
+  const recentLow  = Math.min(...this.priceHistory);
+  const swingPct   = ((recentHigh - recentLow) / recentLow) * 100;
+
+  if (swingPct > this.MAX_VOLATILITY_PCT) {
+    return {
+      action: "HOLD",
+      asset,
+      pair: data.pair,
+      amount: 0,
+      confidence: 0.3,
+      reasoning: `Volatility guard — ${swingPct.toFixed(2)}% swing exceeds ${this.MAX_VOLATILITY_PCT}% limit`,
+    };
+  }
+}
     if (this.circuitBreakerTripped) {
       return {
         action: "HOLD",

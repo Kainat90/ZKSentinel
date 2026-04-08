@@ -433,9 +433,14 @@ export async function runAgent(strategy: TradingStrategy) {
               `${decision.action} ${decision.pair} @ $${market.price}`
             );
             console.log(`[agent] ✓ Checkpoint posted (score=${score}): ${cp.checkpointHash.slice(0, 20)}...`);
-          } catch (e) {
-            console.warn(`[agent] ValidationRegistry post failed (non-fatal):`, e);
-          }
+          // REPLACE WITH:
+} catch (e: any) {
+  if (e?.reason?.includes('not an authorized validator')) {
+    // Judge Bot handles registry posting now — skip silently
+    return;
+  }
+  console.warn(`[agent] ValidationRegistry post failed (non-fatal):`, e);
+}
         } else {
           // Still persist locally — just don't burn gas on it
           console.log(`[agent] ⏭ Checkpoint skipped (${decision.action} confidence=${(decision.confidence * 100).toFixed(0)}% below threshold or warm-up)`);
