@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import logoMark from '../assets/logo-mark.svg';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader } from '../components/Card';
 import { Badge } from '../components/Badge';
@@ -64,6 +65,19 @@ export function Dashboard() {
 
   return (
     <div className="page-fade" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Brand header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <img src={logoMark} alt="ZK Sentinel" style={{ width: 44, height: 44 }} />
+        <div>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 16, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+            ZK Sentinel
+          </div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
+            Autonomous trading agent · Sepolia testnet
+          </div>
+        </div>
+      </div>
+
       {/* Section 1 — Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
         <MetricCard

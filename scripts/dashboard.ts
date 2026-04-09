@@ -158,6 +158,25 @@ function computeReputation(checkpoints: any[]) {
   });
   const proofHistory = Object.entries(phByDay).slice(-14).map(([date, count]) => ({ date, count }));
 
+  // Avg ROI — derived from price deltas between consecutive trade checkpoints
+  let totalRoi = 0;
+  let roiCount = 0;
+  for (let i = 0; i < checkpoints.length; i++) {
+    const cp = checkpoints[i];
+    if (cp.action !== "HOLD" && cp.amountUsd > 0 && i + 1 < checkpoints.length) {
+      const next = checkpoints[i + 1];
+      const pct = cp.priceUsd > 0 ? (next.priceUsd - cp.priceUsd) / cp.priceUsd : 0;
+      const roi = cp.action === "BUY" ? pct * 100 : -pct * 100;
+      totalRoi += roi;
+      roiCount++;
+    }
+  }
+  const avgRoi = roiCount > 0 ? parseFloat((totalRoi / roiCount).toFixed(2)) : 0;
+
+  // Proof success rate — ratio of checkpoints with a valid signature (EIP-712)
+  const signedCount = checkpoints.filter(cp => !!cp.signature).length;
+  const proofSuccessRate = total > 0 ? Math.round((signedCount / total) * 100) : 0;
+
   // Agent age
   const firstTs  = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1].timestamp as number : Date.now() / 1000;
   const ageSecs  = Date.now() / 1000 - firstTs;
@@ -167,8 +186,8 @@ function computeReputation(checkpoints: any[]) {
 
   return {
     score,
-    avgRoi: 0,
-    proofSuccessRate: 100,
+    avgRoi,
+    proofSuccessRate,
     winRate,
     totalTrades: trades.length,
     agentAge,

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 116" fill="none">
+  <!-- Outer hexagon border -->
+  <polygon
+    points="50,4 93,27.5 93,74.5 50,98 7,74.5 7,27.5"
+    fill="none"
+    stroke="#7B1828"
+    stroke-width="1.5"
+  />
+  <!-- Inner hexagon filled -->
+  <polygon
+    points="50,11 87,32 87,70 50,91 13,70 13,32"
+    fill="#7B1828"
+  />
+  <!-- ZK text -->
+  <text
+    x="50"
+    y="70"
+    text-anchor="middle"
+    font-family="'DM Sans', Arial, sans-serif"
+    font-weight="700"
+    font-size="38"
+    fill="#FFFFFF"
+    letter-spacing="-1"
+  >ZK</text>
+  <!-- Three small diamonds -->
+  <rect x="41" y="84" width="4" height="4" rx="0.5" transform="rotate(45 43 86)" fill="rgba(255,255,255,0.5)"/>
+  <rect x="48" y="84" width="4" height="4" rx="0.5" transform="rotate(45 50 86)" fill="rgba(255,255,255,0.5)"/>
+  <rect x="55" y="84" width="4" height="4" rx="0.5" transform="rotate(45 57 86)" fill="rgba(255,255,255,0.5)"/>
+</svg>

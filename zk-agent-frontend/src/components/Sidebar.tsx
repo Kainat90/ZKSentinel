@@ -1,6 +1,38 @@
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, ShieldCheck, History, Star, Settings } from 'lucide-react';
 import { StatusDot } from './StatusDot';
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m ${s}s`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function useUptime(): string {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const key = 'zk_sentinel_start';
+    let start = parseInt(localStorage.getItem(key) ?? '0', 10);
+    if (!start || isNaN(start)) {
+      start = Date.now();
+      localStorage.setItem(key, String(start));
+    }
+
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return formatUptime(elapsed);
+}
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard',     path: '/' },
@@ -11,6 +43,8 @@ const navItems = [
 ];
 
 export function Sidebar() {
+  const uptime = useUptime();
+
   return (
     <nav style={{
       width: 220,
@@ -104,10 +138,10 @@ export function Sidebar() {
             </span>
           </div>
           <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
-            ClaudeStrategy
+            ZK Sentinel Strategy
           </span>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
-            Uptime: 14h 23m
+            Uptime: {uptime}
           </span>
         </div>
       </div>

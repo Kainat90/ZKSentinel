@@ -1,5 +1,6 @@
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import logoMark from '../assets/logo-mark.svg';
 
 export function Header() {
   const { theme, toggleTheme } = useTheme();
@@ -21,25 +22,14 @@ export function Header() {
     }}>
       {/* Left */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          width: 30, height: 30,
-          borderRadius: 8,
-          background: 'rgba(255,255,255,0.15)',
-          border: '1px solid rgba(255,255,255,0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: "'DM Sans', sans-serif",
-          fontWeight: 500,
-          fontSize: 13,
-          color: '#FFFFFF',
-          flexShrink: 0,
-        }}>
-          ZK
-        </div>
+        <img
+          src={logoMark}
+          alt="ZK Sentinel"
+          style={{ width: 32, height: 32, flexShrink: 0 }}
+        />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: '#FFFFFF', lineHeight: 1.4 }}>
-            ZK Trading Agent
+            ZK Sentinel Trading Agent
           </span>
           <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
             agentId: #0x7f3a…e921
