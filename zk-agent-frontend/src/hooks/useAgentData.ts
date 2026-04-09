@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Decision, ZKProof, LogEntry, ReputationData } from '../types';
+import type { Decision, Proof, LogEntry, ReputationData } from '../types';
 import { getSafeApiBase } from '../utils/network';
 
 const API_URL = getSafeApiBase(import.meta.env.VITE_API_URL);
 
 export function useAgentData(wsConnected: boolean) {
   const [decisions,  setDecisions]  = useState<Decision[]>([]);
-  const [proofs,     setProofs]     = useState<ZKProof[]>([]);
+  const [proofs,     setProofs]     = useState<Proof[]>([]);
   const [logs,       _setLogs]      = useState<LogEntry[]>([]);   // logs come via WS only
   const [reputation, setReputation] = useState<ReputationData | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);

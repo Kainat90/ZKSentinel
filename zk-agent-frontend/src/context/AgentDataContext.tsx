@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import type { Decision, ZKProof, LogEntry, ReputationData } from '../types';
+import type { Decision, Proof, LogEntry, ReputationData } from '../types';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAgentData } from '../hooks/useAgentData';
 
@@ -27,7 +27,7 @@ const emptyReputation: ReputationData = {
 
 interface AgentDataContextValue {
   decisions: Decision[];
-  proofs: ZKProof[];
+  proofs: Proof[];
   logs: LogEntry[];
   reputation: ReputationData;
   connected: boolean;

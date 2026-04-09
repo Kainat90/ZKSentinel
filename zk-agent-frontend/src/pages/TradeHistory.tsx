@@ -161,7 +161,7 @@ export function TradeHistory() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--bg-secondary)', height: 38, borderBottom: '0.5px solid var(--border-primary)' }}>
-                {['Time', 'Pair', 'Action', 'Amount', 'Price', 'ZK Proof', 'PnL', 'Checkpoint'].map(col => (
+                {['Time', 'Pair', 'Action', 'Amount', 'Price', 'EIP-712 Proof', 'PnL', 'Checkpoint'].map(col => (
                   <th key={col} style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 12, color: 'var(--text-tertiary)', padding: '0 14px', textAlign: 'left', whiteSpace: 'nowrap' }}>{col}</th>
                 ))}
               </tr>
@@ -250,7 +250,7 @@ export function TradeHistory() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>ZK Proof</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>EIP-712 Proof</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: 'var(--text-secondary)' }}>{selected.proofHash.slice(0, 10)}…</span>
                 <Badge variant={selected.proofStatus === 'PASS' ? 'green' : 'red'}>{selected.proofStatus}</Badge>

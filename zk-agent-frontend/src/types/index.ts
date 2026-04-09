@@ -18,7 +18,7 @@ export interface Decision {
   eip712: boolean;
 }
 
-export interface ZKProof {
+export interface Proof {
   id: string;
   hash: string;
   decision: Action;
@@ -48,7 +48,7 @@ export interface ReputationData {
 
 export interface AgentData {
   decisions: Decision[];
-  proofs: ZKProof[];
+  proofs: Proof[];
   logs: LogEntry[];
   reputation: ReputationData;
   connected: boolean;

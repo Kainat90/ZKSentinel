@@ -5,7 +5,7 @@ import { Card, CardHeader } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { MetricCard } from '../components/MetricCard';
 import { DecisionRow } from '../components/DecisionRow';
-import { ZKProofRow } from '../components/ZKProofRow';
+import { ProofRow } from '../components/ZKProofRow';
 import { ProgressBar } from '../components/ProgressBar';
 import { Toggle } from '../components/Toggle';
 import { useAgentContext } from '../context/AgentDataContext';
@@ -67,10 +67,10 @@ export function Dashboard() {
     <div className="page-fade" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Brand header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <img src={logoMark} alt="ZK Sentinel" style={{ width: 44, height: 44 }} />
+        <img src={logoMark} alt="Sentinel" style={{ width: 44, height: 44 }} />
         <div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 16, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-            ZK Sentinel
+            Sentinel
           </div>
           <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
             Autonomous trading agent · Sepolia testnet
@@ -93,7 +93,7 @@ export function Dashboard() {
           sub={`${reputation.totalTrades} trades`}
         />
         <MetricCard
-          label="ZK proofs"
+          label="EIP-712 proofs"
           value={<span>{passedProofs} <span style={{ fontSize: 14, color: 'var(--green-text)' }}>/ {proofs.length}</span></span>}
           sub={proofs.length > 0 ? 'All passing' : 'No proofs yet'}
           subColor={proofs.length > 0 ? 'var(--green-text)' : undefined}
@@ -140,15 +140,15 @@ export function Dashboard() {
 
         {/* Right column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* ZK Proof Status */}
+          {/* EIP-712 Proof Status */}
           <Card>
             <CardHeader
-              title="ZK proof status"
+              title="EIP-712 proof status"
               right={<Badge variant="purple">Risc0</Badge>}
             />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {recentProofs.length > 0
-                ? recentProofs.map(p => <ZKProofRow key={p.id} proof={p} />)
+                ? recentProofs.map(p => <ProofRow key={p.id} proof={p} />)
                 : emptyState('proofs')}
             </div>
           </Card>
@@ -174,7 +174,7 @@ export function Dashboard() {
             <div style={{ height: '0.5px', background: 'var(--border-primary)', margin: '8px 0' }} />
             {[
               { label: 'Win rate', pct: `${reputation.winRate}%`, val: reputation.winRate, color: 'var(--green-mid)' },
-              { label: 'ZK pass rate', pct: `${reputation.proofSuccessRate}%`, val: reputation.proofSuccessRate, color: 'var(--purple-mid)' },
+              { label: 'Proof pass rate', pct: `${reputation.proofSuccessRate}%`, val: reputation.proofSuccessRate, color: 'var(--purple-mid)' },
             ].map(({ label, pct, val, color }) => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -232,7 +232,7 @@ export function Dashboard() {
             ))}
             {[
               { k: 'DeFi yield context', key: 'defi' as const },
-              { k: 'ZK proof layer', key: 'zk' as const },
+              { k: 'EIP-712 layer', key: 'zk' as const },
               { k: 'Live mode', key: 'live' as const },
             ].map(({ k, key }) => (
               <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

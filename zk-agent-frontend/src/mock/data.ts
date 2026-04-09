@@ -1,4 +1,4 @@
-import type { Decision, ZKProof, LogEntry, ReputationData } from '../types';
+import type { Decision, Proof, LogEntry, ReputationData } from '../types';
 
 const hashes = [
   '0x3fa8c2e1d9b47f5a6c0e82b4d1f9a3c7',
@@ -20,17 +20,17 @@ const reasonings = [
   "SOL/USD stalled at resistance $142.30 after 8% rally. ETH gas fees elevated suggesting network congestion risk. Aave v3 ETH supply APY 2.4% — holding current allocation is optimal until momentum resumes.",
   "ETH/USD break below $3,180 support with volume spike. Compound USDC rate at 4.2% offers better risk-adjusted return than holding ETH here. Max drawdown rule prevents sizing below -8% from entry.",
   "BTC dominance increased to 54.2% — risk-off signal for alts. BTC/USD holding $65,800 support, Kraken order book shows strong bid wall at $65,500. DeFi TVL stable. Initiating BUY with 20% position.",
-  "ETH/USD printing higher lows on 4h chart. Aave ETH APY 2.1% plus expected price appreciation makes hold position justified. ZK proof validates position within single-asset 50% limit.",
+  "ETH/USD printing higher lows on 4h chart. Aave ETH APY 2.1% plus expected price appreciation makes hold position justified. EIP-712 proof validates position within single-asset 50% limit.",
   "BTC/USD rejected at $68,000 resistance three times. Profit taking triggered at +4.2% gain. Kraken liquidity thin above $68k. Rotating to stablecoin yield — Compound USDC at 4.1%.",
   "SOL ecosystem activity surging — Jito restaking APY 7.3%. SOL/USD breakout from $138 consolidation zone. Position sizing at 15% respects max drawdown constraint. Conviction: high.",
   "Market maker spread widening on ETH/USD — liquidity degrading. Aave utilization rate at 87% warning signal. HOLD current BTC position which is +2.1% and within risk parameters.",
   "BTC halving supply effect materializing — daily issuance dropped 50%. Long-term holder accumulation on-chain. Current price $66,100 offers favorable entry vs $70k target. Initiating BUY.",
   "ETH/USD momentum fading at $3,250 after Fed minutes release. DXY strengthening to 104.2. Risk management protocol: reduce exposure. Selling 0.4 ETH to lock in +1.8% gain.",
-  "Cross-asset correlation spike — BTC and ETH both dipping with S&P500. Macro uncertainty from FOMC statement. Holding USDC in Aave at 3.8% APY until clarity. ZK proof confirms HOLD rule compliance.",
+  "Cross-asset correlation spike — BTC and ETH both dipping with S&P500. Macro uncertainty from FOMC statement. Holding USDC in Aave at 3.8% APY until clarity. EIP-712 proof confirms HOLD rule compliance.",
   "BTC/USD double bottom pattern at $64,800 confirmed with volume. Order flow analysis shows institutional accumulation. Max position 25%, current 18% — room to add. Confidence: 91%.",
   "SOL/USD rejected at $150 psychological level. Profit target hit at +6.3%. Reallocating to ETH/USD which shows better momentum profile on 1D chart. Rule check: all limits satisfied.",
   "Aave v3 WBTC collateral ratio adjusted — slightly less efficient for leveraged exposure. Direct BTC position on Kraken preferred. Initiating 0.08 BTC buy at $66,800 market price.",
-  "ETH staking APY via Lido at 4.1% — higher than current DeFi yields. HOLD ETH position and collect staking rewards. ZK rule validation: position 22% < 25% max. Proof passing.",
+  "ETH staking APY via Lido at 4.1% — higher than current DeFi yields. HOLD ETH position and collect staking rewards. Rule validation: position 22% < 25% max. Proof passing.",
 ];
 
 export const mockDecisions: Decision[] = Array.from({ length: 50 }, (_, i) => {
@@ -63,7 +63,7 @@ export const mockDecisions: Decision[] = Array.from({ length: 50 }, (_, i) => {
   };
 });
 
-export const mockProofs: ZKProof[] = Array.from({ length: 50 }, (_, i) => ({
+export const mockProofs: Proof[] = Array.from({ length: 50 }, (_, i) => ({
   id: `proof-${i}`,
   hash: hashes[i % hashes.length],
   decision: (['BUY', 'SELL', 'HOLD'] as const)[i % 3],
@@ -73,14 +73,14 @@ export const mockProofs: ZKProof[] = Array.from({ length: 50 }, (_, i) => ({
 }));
 
 const logMessages = [
-  'ZK proof generated · receipt_<code>0x3fa8c</code> stored',
+  'EIP-712 proof generated · receipt_<code>0x3fa8c</code> stored',
   'TradeDecision → EIP-712 checkpoint signed',
   'Claude strategy: BUY 0.12 BTC · confidence 88%',
   'Market data fetched · Aave APY 3.1% · Kraken $67,420',
   'ReputationRegistry updated · score 712 +4',
   'HOLD decision · proof hash posted on-chain',
   'Agent started · strategy: <code>ClaudeStrategy</code>',
-  'ZK proof verified · receipt_<code>0x7b2d4</code> confirmed',
+  'EIP-712 proof verified · receipt_<code>0x7b2d4</code> confirmed',
   'Market data fetched · Compound USDC 4.2% · ETH $3,180',
   'SELL 0.8 ETH · proof hash <code>0x1c5e9a</code> posted',
   'ReputationRegistry updated · score 708 +2',

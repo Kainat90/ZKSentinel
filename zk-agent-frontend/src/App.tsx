@@ -4,7 +4,7 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
 import { Dashboard } from './pages/Dashboard';
-import { ZKProofs } from './pages/ZKProofs';
+import { Proofs } from './pages/ZKProofs';
 import { TradeHistory } from './pages/TradeHistory';
 import { Reputation } from './pages/Reputation';
 import { Config } from './pages/Config';
@@ -12,11 +12,11 @@ import { AgentDataProvider, useAgentContext } from './context/AgentDataContext';
 import './styles/global.css';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'ZK Agent — Dashboard',
-  '/zk-proofs': 'ZK Agent — ZK Proofs',
-  '/trade-history': 'ZK Agent — Trade History',
-  '/reputation': 'ZK Agent — Reputation',
-  '/config': 'ZK Agent — Config',
+  '/': 'Sentinel — Dashboard',
+  '/proofs': 'Sentinel — EIP-712 Proofs',
+  '/trade-history': 'Sentinel — Trade History',
+  '/reputation': 'Sentinel — Reputation',
+  '/config': 'Sentinel — Config',
 };
 
 function AppContent() {
@@ -24,7 +24,7 @@ function AppContent() {
   const { connected } = useAgentContext();
 
   React.useEffect(() => {
-    document.title = PAGE_TITLES[location.pathname] || 'ZK Agent';
+    document.title = PAGE_TITLES[location.pathname] || 'Sentinel';
   }, [location.pathname]);
 
   return (
@@ -61,7 +61,7 @@ function AppContent() {
       }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/zk-proofs" element={<ZKProofs />} />
+          <Route path="/proofs" element={<Proofs />} />
           <Route path="/trade-history" element={<TradeHistory />} />
           <Route path="/reputation" element={<Reputation />} />
           <Route path="/config" element={<Config />} />

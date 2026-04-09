@@ -11,7 +11,7 @@
     points="50,11 87,32 87,70 50,91 13,70 13,32"
     fill="#7B1828"
   />
-  <!-- ZK text -->
+  <!-- S text -->
   <text
     x="50"
     y="70"
@@ -21,7 +21,7 @@
     font-size="38"
     fill="#FFFFFF"
     letter-spacing="-1"
-  >ZK</text>
+  >S</text>
   <!-- Three small diamonds -->
   <rect x="41" y="84" width="4" height="4" rx="0.5" transform="rotate(45 43 86)" fill="rgba(255,255,255,0.5)"/>
   <rect x="48" y="84" width="4" height="4" rx="0.5" transform="rotate(45 50 86)" fill="rgba(255,255,255,0.5)"/>

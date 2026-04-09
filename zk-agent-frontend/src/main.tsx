@@ -4,7 +4,7 @@ import App from './App';
 import './styles/global.css';
 
 // Apply persisted theme before first render
-const savedTheme = localStorage.getItem('zk-theme') || 'light';
+const savedTheme = localStorage.getItem('sentinel-theme') || 'light';
 document.documentElement.setAttribute('data-theme', savedTheme);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

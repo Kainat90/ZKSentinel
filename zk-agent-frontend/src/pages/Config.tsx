@@ -30,7 +30,7 @@ export function Config() {
   const [decisionInterval,   setDecisionInterval]   = useState(300);
   const [claudeOn,           setClaudeOn]           = useState(true);
   const [defiOn,             setDefiOn]             = useState(true);
-  const [zkOn,               setZkOn]               = useState(true);
+  const [proofOn,            setProofOn]            = useState(true);
   const [liveOn,             setLiveOn]             = useState(false);
   const [status,             setStatus]             = useState<AgentStatus | null>(null);
   const [statusError,        setStatusError]        = useState(false);
@@ -148,7 +148,7 @@ export function Config() {
           {[
             { label: 'VolumeConfirmedMomentum', desc: 'Rule-based strategy: OBV + VWAP + volume', val: claudeOn, set: setClaudeOn },
             { label: 'DeFi yield context',      desc: 'Include Aave/Compound APY in prompt',       val: defiOn,   set: setDefiOn   },
-            { label: 'ZK proof layer',           desc: 'Validate decisions via Risc0',              val: zkOn,     set: setZkOn     },
+            { label: 'EIP-712 layer',             desc: 'Validate decisions via Risc0',              val: proofOn,  set: setProofOn  },
             { label: 'Live mode (Kraken)',        desc: 'Switch from sandbox to live trading',       val: liveOn,   set: setLiveOn   },
           ].map(({ label, desc, val, set }) => (
             <div key={label} style={{ marginBottom: 14 }}>

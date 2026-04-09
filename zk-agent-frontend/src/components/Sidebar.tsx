@@ -18,7 +18,7 @@ function useUptime(): string {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    const key = 'zk_sentinel_start';
+    const key = 'sentinel_start';
     let start = parseInt(localStorage.getItem(key) ?? '0', 10);
     if (!start || isNaN(start)) {
       start = Date.now();
@@ -36,7 +36,7 @@ function useUptime(): string {
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard',     path: '/' },
-  { icon: ShieldCheck,      label: 'ZK Proofs',    path: '/zk-proofs' },
+  { icon: ShieldCheck,      label: 'EIP-712 Proofs', path: '/proofs' },
   { icon: History,          label: 'Trade History', path: '/trade-history' },
   { icon: Star,             label: 'Reputation',   path: '/reputation' },
   { icon: Settings,         label: 'Config',       path: '/config' },
@@ -138,7 +138,7 @@ export function Sidebar() {
             </span>
           </div>
           <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
-            ZK Sentinel Strategy
+            Sentinel Strategy
           </span>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
             Uptime: {uptime}

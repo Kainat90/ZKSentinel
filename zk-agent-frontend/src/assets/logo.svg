@@ -11,7 +11,7 @@
     points="100,18 175,61 175,143 100,186 25,143 25,61"
     fill="#7B1828"
   />
-  <!-- ZK text -->
+  <!-- S text -->
   <text
     x="100"
     y="128"
@@ -21,12 +21,12 @@
     font-size="72"
     fill="#FFFFFF"
     letter-spacing="-2"
-  >ZK</text>
+  >S</text>
   <!-- Three small diamonds at bottom of hex -->
   <rect x="88"  y="170" width="7" height="7" rx="1" transform="rotate(45 91.5 173.5)" fill="rgba(255,255,255,0.5)"/>
   <rect x="100" y="170" width="7" height="7" rx="1" transform="rotate(45 103.5 173.5)" fill="rgba(255,255,255,0.5)"/>
   <rect x="112" y="170" width="7" height="7" rx="1" transform="rotate(45 115.5 173.5)" fill="rgba(255,255,255,0.5)"/>
-  <!-- ZK SENTINEL text -->
+  <!-- SENTINEL text -->
   <text
     x="100"
     y="216"
@@ -36,7 +36,7 @@
     font-size="18"
     fill="#7B1828"
     letter-spacing="2"
-  ><tspan fill="#7B1828">ZK</tspan><tspan fill="#1a1a1a"> SENTINEL</tspan></text>
+  ><tspan fill="#1a1a1a">SENTINEL</tspan></text>
   <!-- Tagline -->
   <text
     x="100"

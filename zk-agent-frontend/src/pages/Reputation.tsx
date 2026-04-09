@@ -95,7 +95,7 @@ export function Reputation() {
             {[
               { label: 'Win rate',            pct: `${reputation.winRate}%`,            val: reputation.winRate,            color: greenMid },
               { label: 'Average confidence',  pct: `${reputation.proofSuccessRate}%`,   val: reputation.proofSuccessRate,   color: purpleMid },
-              { label: 'ZK pass rate',        pct: `${reputation.proofSuccessRate}%`,   val: reputation.proofSuccessRate,   color: brandColor },
+              { label: 'Proof pass rate',      pct: `${reputation.proofSuccessRate}%`,   val: reputation.proofSuccessRate,   color: brandColor },
             ].map(({ label, pct, val, color }) => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>

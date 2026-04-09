@@ -3,7 +3,7 @@ import { LayoutDashboard, ShieldCheck, History, Star, Settings } from 'lucide-re
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard',  path: '/' },
-  { icon: ShieldCheck,      label: 'ZK Proofs', path: '/zk-proofs' },
+  { icon: ShieldCheck,      label: 'EIP-712 Proofs', path: '/proofs' },
   { icon: History,          label: 'History',   path: '/trade-history' },
   { icon: Star,             label: 'Reputation',path: '/reputation' },
   { icon: Settings,         label: 'Config',    path: '/config' },

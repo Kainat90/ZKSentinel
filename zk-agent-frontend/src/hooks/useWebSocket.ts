@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Decision, ZKProof, LogEntry, ReputationData } from '../types';
+import type { Decision, Proof, LogEntry, ReputationData } from '../types';
 import { getSafeWsUrl } from '../utils/network';
 
 const WS_URL = getSafeWsUrl(import.meta.env.VITE_WS_URL);
 
 export function useWebSocket() {
   const [decisions,   setDecisions]   = useState<Decision[]>([]);
-  const [proofs,      setProofs]      = useState<ZKProof[]>([]);
+  const [proofs,      setProofs]      = useState<Proof[]>([]);
   const [logs,        setLogs]        = useState<LogEntry[]>([]);
   const [reputation,  setReputation]  = useState<ReputationData | null>(null);
   const [connected,   setConnected]   = useState(false);
@@ -30,7 +30,7 @@ export function useWebSocket() {
           if (msg.type === 'decision') {
             setDecisions(prev => [msg.data as Decision, ...prev].slice(0, 50));
           } else if (msg.type === 'proof') {
-            setProofs(prev => [msg.data as ZKProof, ...prev].slice(0, 50));
+            setProofs(prev => [msg.data as Proof, ...prev].slice(0, 50));
           } else if (msg.type === 'log') {
             setLogs(prev => [msg.data as LogEntry, ...prev].slice(0, 100));
           } else if (msg.type === 'reputation') {

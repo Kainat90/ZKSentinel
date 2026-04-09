@@ -1,10 +1,10 @@
-import type { ZKProof } from '../types';
+import type { Proof } from '../types';
 
 interface Props {
-  proof: ZKProof;
+  proof: Proof;
 }
 
-export function ZKProofRow({ proof }: Props) {
+export function ProofRow({ proof }: Props) {
   const isPass = proof.status === 'PASS';
   const truncated = `${proof.hash.slice(0, 7)}…${proof.hash.slice(-4)}`;
 
