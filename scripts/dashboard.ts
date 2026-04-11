@@ -13,23 +13,90 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import type { Request, Response, NextFunction } from "express";
 import * as fs from "fs";
 import * as path from "path";
 import * as http from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import { ethers } from "ethers";
 
 const app = express();
 const PORT = process.env.DASHBOARD_PORT || 3000;
 const CHECKPOINTS_FILE = path.join(process.cwd(), "checkpoints.jsonl");
 
-// ─── CORS (allows the React frontend on :5173 to call this server) ────────────
+// ─── Allowed origins ─────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:5173",  // Vite dev server
+  "http://localhost:5174",
+  "http://164.92.173.167",  // Production IP
+  `http://164.92.173.167:${process.env.DASHBOARD_PORT ?? 3001}`,
+]);
 
-app.use((_req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") { res.sendStatus(204); return; }
   next();
 });
+
+// ─── Rate limiting (100 req/min per IP) ──────────────────────────────────────
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const ip  = req.ip ?? "unknown";
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+  } else {
+    entry.count++;
+    if (entry.count > 100) {
+      res.status(429).json({ error: "Too many requests — limit is 100 req/min" });
+      return;
+    }
+  }
+  next();
+});
+// Purge stale entries every 5 min to avoid unbounded growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now > entry.resetAt) rateLimitMap.delete(ip);
+  }
+}, 300_000);
+
+// ─── On-chain reputation cache ────────────────────────────────────────────────
+const REPUTATION_ABI = [
+  "function getAverageScore(uint256 agentId) external view returns (uint256)",
+  "function reputation(uint256 agentId) external view returns (uint256 totalScore, uint256 feedbackCount, uint256 lastUpdated)",
+];
+
+let onChainScore = 0;
+let onChainFeedbackCount = 0;
+
+async function refreshOnChainReputation() {
+  const rpcUrl      = process.env.SEPOLIA_RPC_URL;
+  const registryAddr = process.env.REPUTATION_REGISTRY_ADDRESS;
+  const agentId     = process.env.AGENT_ID;
+  if (!rpcUrl || !registryAddr || !agentId) return;
+  try {
+    const provider  = new ethers.JsonRpcProvider(rpcUrl);
+    const contract  = new ethers.Contract(registryAddr, REPUTATION_ABI, provider);
+    const summary   = await contract.reputation(BigInt(agentId));
+    onChainFeedbackCount = Number(summary.feedbackCount);
+    onChainScore = onChainFeedbackCount > 0
+      ? Math.round(Number(summary.totalScore) / onChainFeedbackCount)
+      : 0;
+  } catch { /* RPC unavailable — keep cached value */ }
+}
+// Refresh immediately on start, then every 5 minutes
+refreshOnChainReputation();
+setInterval(refreshOnChainReputation, 300_000);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -112,7 +179,7 @@ function toDecisionList(checkpoints: any[]) {
   return result.reverse();
 }
 
-/** Compute reputation stats from all checkpoints */
+/** Compute reputation stats from all checkpoints, blending on-chain score when available */
 function computeReputation(checkpoints: any[]) {
   const trades = checkpoints.filter(cp => cp.action !== "HOLD");
   const buys   = checkpoints.filter(cp => cp.action === "BUY").length;
@@ -184,8 +251,15 @@ function computeReputation(checkpoints: any[]) {
   const ageHours = Math.floor(ageSecs / 3600);
   const agentAge = ageDays > 0 ? `${ageDays} day${ageDays !== 1 ? "s" : ""}` : `${ageHours}h`;
 
+  // Use the on-chain score (0-100) when validators have submitted feedback;
+  // otherwise fall back to the local off-chain estimate.
+  const displayScore = onChainFeedbackCount > 0 ? onChainScore : score;
+
   return {
-    score,
+    score: displayScore,
+    onChainScore:         onChainFeedbackCount > 0 ? onChainScore : null,
+    onChainFeedbackCount,
+    offChainEstimate:     score,
     avgRoi,
     proofSuccessRate,
     winRate,

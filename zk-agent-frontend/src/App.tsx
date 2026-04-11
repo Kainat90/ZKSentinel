@@ -7,7 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Proofs } from './pages/ZKProofs';
 import { TradeHistory } from './pages/TradeHistory';
 import { Reputation } from './pages/Reputation';
-import { Config } from './pages/Config';
+import { About } from './pages/About';
 import { AgentDataProvider, useAgentContext } from './context/AgentDataContext';
 import './styles/global.css';
 
@@ -16,7 +16,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/proofs': 'Sentinel — EIP-712 Proofs',
   '/trade-history': 'Sentinel — Trade History',
   '/reputation': 'Sentinel — Reputation',
-  '/config': 'Sentinel — Config',
+  '/about': 'Sentinel — About',
 };
 
 function AppContent() {
@@ -64,7 +64,7 @@ function AppContent() {
           <Route path="/proofs" element={<Proofs />} />
           <Route path="/trade-history" element={<TradeHistory />} />
           <Route path="/reputation" element={<Reputation />} />
-          <Route path="/config" element={<Config />} />
+          <Route path="/about" element={<About />} />
         </Routes>
       </main>
 

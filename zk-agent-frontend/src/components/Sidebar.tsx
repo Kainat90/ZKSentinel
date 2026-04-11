@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ShieldCheck, History, Star, Settings } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, History, Star, Info } from 'lucide-react';
 import { StatusDot } from './StatusDot';
 
 function formatUptime(seconds: number): string {
@@ -39,7 +39,7 @@ const navItems = [
   { icon: ShieldCheck,      label: 'EIP-712 Proofs', path: '/proofs' },
   { icon: History,          label: 'Trade History', path: '/trade-history' },
   { icon: Star,             label: 'Reputation',   path: '/reputation' },
-  { icon: Settings,         label: 'Config',       path: '/config' },
+  { icon: Info,             label: 'About',        path: '/about' },
 ];
 
 export function Sidebar() {
