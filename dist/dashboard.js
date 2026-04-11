@@ -1,105 +1,102 @@
-/**
- * Trading Agent Dashboard — Express server with embedded UI + React frontend API
- *
- * Usage:
- *   npx ts-node scripts/dashboard.ts
- *
- * Opens a live dashboard at http://localhost:3000
- * Also exposes a REST + WebSocket API consumed by the React frontend (zk-agent-frontend).
- * Run alongside npm run run-agent in a separate terminal.
- */
-
-import * as dotenv from "dotenv";
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var dotenv = __toESM(require("dotenv"));
+var import_express = __toESM(require("express"));
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
+var http = __toESM(require("http"));
+var import_ws = require("ws");
 dotenv.config();
-
-import express from "express";
-import * as fs from "fs";
-import * as path from "path";
-import * as http from "http";
-import { WebSocketServer, WebSocket } from "ws";
-
-const app = express();
-const PORT = process.env.DASHBOARD_PORT || 3000;
+const app = (0, import_express.default)();
+const PORT = process.env.DASHBOARD_PORT || 3e3;
 const CHECKPOINTS_FILE = path.join(process.cwd(), "checkpoints.jsonl");
-
-// ─── CORS (allows the React frontend on :5173 to call this server) ────────────
-
 app.use((_req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   next();
 });
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function readCheckpoints(): any[] {
+function readCheckpoints() {
   if (!fs.existsSync(CHECKPOINTS_FILE)) return [];
   const raw = fs.readFileSync(CHECKPOINTS_FILE, "utf8").trim();
   if (!raw) return [];
-  return raw
-    .split("\n")
-    .map(l => { try { return JSON.parse(l); } catch { return null; } })
-    .filter(Boolean);
+  return raw.split("\n").map((l) => {
+    try {
+      return JSON.parse(l);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
 }
-
-function timeAgo(timestampSeconds: number): string {
-  const secs = Math.floor(Date.now() / 1000 - timestampSeconds);
-  if (secs < 60)  return `${secs}s ago`;
+function timeAgo(timestampSeconds) {
+  const secs = Math.floor(Date.now() / 1e3 - timestampSeconds);
+  if (secs < 60) return `${secs}s ago`;
   if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
   if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
   return `${Math.floor(secs / 86400)}d ago`;
 }
-
-function normalizePair(pair: string): string {
+function normalizePair(pair) {
   return pair.replace("XBT", "BTC").replace(/USD$/, "/USD");
 }
-
-function formatAmount(cp: any): string {
-  if (!cp.amountUsd || cp.amountUsd === 0) return "—";
-  const asset = ((cp.asset || cp.pair?.replace("USD", "") || "BTC") as string).replace("XBT", "BTC");
+function formatAmount(cp) {
+  if (!cp.amountUsd || cp.amountUsd === 0) return "\u2014";
+  const asset = (cp.asset || cp.pair?.replace("USD", "") || "BTC").replace("XBT", "BTC");
   const coins = cp.priceUsd > 0 ? (cp.amountUsd / cp.priceUsd).toFixed(6) : "0";
   return `${coins} ${asset}`;
 }
-
-/** Convert a checkpoint to the Decision shape the React frontend expects */
-function toDecision(cp: any, _idx: number, pnl = 0) {
+function toDecision(cp, _idx, pnl = 0) {
   return {
     id: `dec-${cp.timestamp}`,
-    action: cp.action as "BUY" | "SELL" | "HOLD",
-    reasoning: cp.reasoning ?? "—",
+    action: cp.action,
+    reasoning: cp.reasoning ?? "\u2014",
     confidence: Math.round((cp.confidence ?? 0.5) * 100),
-    timestamp: new Date((cp.timestamp as number) * 1000).toISOString(),
-    timeAgo: timeAgo(cp.timestamp as number),
+    timestamp: new Date(cp.timestamp * 1e3).toISOString(),
+    timeAgo: timeAgo(cp.timestamp),
     pair: normalizePair(cp.pair ?? "BTCUSD"),
     amount: formatAmount(cp),
     price: `$${Number(cp.priceUsd ?? 0).toLocaleString("en-US", {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 2
     })}`,
     pnl: parseFloat(pnl.toFixed(2)),
-    proofHash: cp.reasoningHash ?? cp.signature?.slice(0, 34) ?? "—",
-    proofStatus: "PASS" as const,
-    checkpointHash: cp.reasoningHash ?? "—",
-    eip712: !!cp.signature,
+    proofHash: cp.reasoningHash ?? cp.signature?.slice(0, 34) ?? "\u2014",
+    proofStatus: "PASS",
+    checkpointHash: cp.reasoningHash ?? "\u2014",
+    eip712: !!cp.signature
   };
 }
-
-/** Convert a checkpoint to the ZKProof shape the React frontend expects */
-function toProof(cp: any, _idx: number) {
+function toProof(cp, _idx) {
   return {
     id: `proof-${cp.timestamp}`,
-    hash: cp.reasoningHash ?? cp.signature?.slice(0, 34) ?? "—",
-    decision: cp.action as "BUY" | "SELL" | "HOLD",
-    rule: cp.action === "HOLD" ? "No trade — HOLD rule" : "Position limits validated",
-    status: "PASS" as const,
-    timestamp: new Date((cp.timestamp as number) * 1000).toISOString(),
+    hash: cp.reasoningHash ?? cp.signature?.slice(0, 34) ?? "\u2014",
+    decision: cp.action,
+    rule: cp.action === "HOLD" ? "No trade \u2014 HOLD rule" : "Position limits validated",
+    status: "PASS",
+    timestamp: new Date(cp.timestamp * 1e3).toISOString()
   };
 }
-
-/** Build an ordered Decision list with approximate PnL derived from price deltas */
-function toDecisionList(checkpoints: any[]) {
-  // checkpoints is oldest-first; compute forward pnl then reverse for newest-first display
+function toDecisionList(checkpoints) {
   const result = checkpoints.map((cp, i) => {
     let pnl = 0;
     if (cp.action !== "HOLD" && cp.amountUsd > 0 && i + 1 < checkpoints.length) {
@@ -111,20 +108,17 @@ function toDecisionList(checkpoints: any[]) {
   });
   return result.reverse();
 }
-
-/** Compute reputation stats from all checkpoints */
-function computeReputation(checkpoints: any[]) {
-  const trades = checkpoints.filter(cp => cp.action !== "HOLD");
-  const buys   = checkpoints.filter(cp => cp.action === "BUY").length;
-  const total  = checkpoints.length;
-  const winRate = total > 0 ? Math.round((buys / total) * 100) : 0;
-  const score   = Math.min(900, 500 + Math.round(winRate * 2) + Math.min(trades.length * 2, 200));
-
-  // Score history — one entry per day, running accumulation
-  const byDay: Record<string, number[]> = {};
-  checkpoints.forEach(cp => {
-    const day = new Date((cp.timestamp as number) * 1000).toLocaleDateString("en-US", {
-      month: "short", day: "numeric",
+function computeReputation(checkpoints) {
+  const trades = checkpoints.filter((cp) => cp.action !== "HOLD");
+  const buys = checkpoints.filter((cp) => cp.action === "BUY").length;
+  const total = checkpoints.length;
+  const winRate = total > 0 ? Math.round(buys / total * 100) : 0;
+  const score = Math.min(900, 500 + Math.round(winRate * 2) + Math.min(trades.length * 2, 200));
+  const byDay = {};
+  checkpoints.forEach((cp) => {
+    const day = new Date(cp.timestamp * 1e3).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric"
     });
     if (!byDay[day]) byDay[day] = [];
     byDay[day].push(cp.confidence ?? 0.5);
@@ -135,30 +129,26 @@ function computeReputation(checkpoints: any[]) {
     running = Math.round(running + avg * 10);
     return { date, score: running };
   });
-
-  // Win/loss chart — trades per day
-  const wlByDay: Record<string, { wins: number; losses: number }> = {};
-  checkpoints.forEach(cp => {
-    const day = new Date((cp.timestamp as number) * 1000).toLocaleDateString("en-US", {
-      month: "short", day: "numeric",
+  const wlByDay = {};
+  checkpoints.forEach((cp) => {
+    const day = new Date(cp.timestamp * 1e3).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric"
     });
     if (!wlByDay[day]) wlByDay[day] = { wins: 0, losses: 0 };
     if (cp.action !== "HOLD") wlByDay[day].wins++;
-    else                      wlByDay[day].losses++;
+    else wlByDay[day].losses++;
   });
   const winLoss = Object.entries(wlByDay).slice(-14).map(([date, v]) => ({ date, ...v }));
-
-  // Proof history — count per day
-  const phByDay: Record<string, number> = {};
-  checkpoints.forEach(cp => {
-    const day = new Date((cp.timestamp as number) * 1000).toLocaleDateString("en-US", {
-      month: "short", day: "numeric",
+  const phByDay = {};
+  checkpoints.forEach((cp) => {
+    const day = new Date(cp.timestamp * 1e3).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric"
     });
     phByDay[day] = (phByDay[day] ?? 0) + 1;
   });
   const proofHistory = Object.entries(phByDay).slice(-14).map(([date, count]) => ({ date, count }));
-
-  // Avg ROI — derived from price deltas between consecutive trade checkpoints
   let totalRoi = 0;
   let roiCount = 0;
   for (let i = 0; i < checkpoints.length; i++) {
@@ -172,18 +162,13 @@ function computeReputation(checkpoints: any[]) {
     }
   }
   const avgRoi = roiCount > 0 ? parseFloat((totalRoi / roiCount).toFixed(2)) : 0;
-
-  // Proof success rate — ratio of checkpoints with a valid signature (EIP-712)
-  const signedCount = checkpoints.filter(cp => !!cp.signature).length;
-  const proofSuccessRate = total > 0 ? Math.round((signedCount / total) * 100) : 0;
-
-  // Agent age
-  const firstTs  = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1].timestamp as number : Date.now() / 1000;
-  const ageSecs  = Date.now() / 1000 - firstTs;
-  const ageDays  = Math.floor(ageSecs / 86400);
+  const signedCount = checkpoints.filter((cp) => !!cp.signature).length;
+  const proofSuccessRate = total > 0 ? Math.round(signedCount / total * 100) : 0;
+  const firstTs = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1].timestamp : Date.now() / 1e3;
+  const ageSecs = Date.now() / 1e3 - firstTs;
+  const ageDays = Math.floor(ageSecs / 86400);
   const ageHours = Math.floor(ageSecs / 3600);
   const agentAge = ageDays > 0 ? `${ageDays} day${ageDays !== 1 ? "s" : ""}` : `${ageHours}h`;
-
   return {
     score,
     avgRoi,
@@ -194,38 +179,39 @@ function computeReputation(checkpoints: any[]) {
     history,
     winLoss,
     proofHistory,
-    contractAddress: process.env.REPUTATION_REGISTRY_ADDRESS ?? "0x0000000000000000000000000000000000000000",
+    contractAddress: process.env.REPUTATION_REGISTRY_ADDRESS ?? "0x0000000000000000000000000000000000000000"
   };
 }
-
-// ─── Existing API ─────────────────────────────────────────────────────────────
-
 app.get("/api/status", (_req, res) => {
   res.json({
-    agentId:  process.env.AGENT_ID ?? "—",
-    wallet:   process.env.HOT_WALLET_PRIVATE_KEY ? "(hot wallet set)" : process.env.PRIVATE_KEY ? "(operator wallet)" : "—",
-    pair:     process.env.TRADING_PAIR ?? "XBTUSD",
-    sandbox:  process.env.KRAKEN_SANDBOX !== "false",
-    network:  "Sepolia",
-    interval: parseInt(process.env.POLL_INTERVAL_MS ?? "30000") / 1000,
+    agentId: process.env.AGENT_ID ?? "\u2014",
+    wallet: process.env.HOT_WALLET_PRIVATE_KEY ? "(hot wallet set)" : process.env.PRIVATE_KEY ? "(operator wallet)" : "\u2014",
+    pair: process.env.TRADING_PAIR ?? "XBTUSD",
+    sandbox: process.env.KRAKEN_SANDBOX !== "false",
+    network: "Sepolia",
+    interval: parseInt(process.env.POLL_INTERVAL_MS ?? "30000") / 1e3,
     contracts: {
-      agentRegistry:      process.env.AGENT_REGISTRY_ADDRESS      ?? null,
-      hackathonVault:     process.env.HACKATHON_VAULT_ADDRESS      ?? null,
-      riskRouter:         process.env.RISK_ROUTER_ADDRESS          ?? null,
-      reputationRegistry: process.env.REPUTATION_REGISTRY_ADDRESS  ?? null,
-      validationRegistry: process.env.VALIDATION_REGISTRY_ADDRESS  ?? null,
-    },
+      agentRegistry: process.env.AGENT_REGISTRY_ADDRESS ?? null,
+      hackathonVault: process.env.HACKATHON_VAULT_ADDRESS ?? null,
+      riskRouter: process.env.RISK_ROUTER_ADDRESS ?? null,
+      reputationRegistry: process.env.REPUTATION_REGISTRY_ADDRESS ?? null,
+      validationRegistry: process.env.VALIDATION_REGISTRY_ADDRESS ?? null
+    }
   });
 });
-
 app.get("/api/checkpoints", (_req, res) => {
   if (!fs.existsSync(CHECKPOINTS_FILE)) return res.json([]);
   const raw = fs.readFileSync(CHECKPOINTS_FILE, "utf8").trim();
   if (!raw) return res.json([]);
-  const all = raw.split("\n").map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  const all = raw.split("\n").map((l) => {
+    try {
+      return JSON.parse(l);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
   res.json(all.slice(-50).reverse());
 });
-
 app.get("/api/price", (_req, res) => {
   if (!fs.existsSync(CHECKPOINTS_FILE)) return res.json({ price: null });
   const raw = fs.readFileSync(CHECKPOINTS_FILE, "utf8").trim();
@@ -238,26 +224,18 @@ app.get("/api/price", (_req, res) => {
     res.json({ price: null });
   }
 });
-
-// ─── New API (consumed by React frontend) ────────────────────────────────────
-
 app.get("/api/decisions", (_req, res) => {
   const all = readCheckpoints();
   res.json(toDecisionList(all).slice(0, 50));
 });
-
 app.get("/api/proofs", (_req, res) => {
   const all = readCheckpoints();
   res.json(all.slice(-50).reverse().map((cp, i) => toProof(cp, i)));
 });
-
 app.get("/api/reputation", (_req, res) => {
   const all = readCheckpoints();
   res.json(computeReputation(all));
 });
-
-// ─── HTML (embedded legacy dashboard — runs alongside React frontend) ─────────
-
 const HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -689,7 +667,7 @@ const HTML = `<!DOCTYPE html>
 
     <div class="price-hero">
       <div class="price-label">BTC / USD</div>
-      <div class="price-value" id="price-display">—</div>
+      <div class="price-value" id="price-display">\u2014</div>
       <div class="price-change" id="price-change"></div>
     </div>
 
@@ -703,15 +681,15 @@ const HTML = `<!DOCTYPE html>
       <div class="panel-header" style="padding: 0 0 10px; border: none;">Agent Info</div>
       <div class="info-row">
         <span class="info-key">Agent ID</span>
-        <span class="info-value accent" id="info-agent-id">—</span>
+        <span class="info-value accent" id="info-agent-id">\u2014</span>
       </div>
       <div class="info-row">
         <span class="info-key">Wallet</span>
-        <span class="info-value" id="info-wallet">—</span>
+        <span class="info-value" id="info-wallet">\u2014</span>
       </div>
       <div class="info-row">
         <span class="info-key">Pair</span>
-        <span class="info-value" id="info-pair">—</span>
+        <span class="info-value" id="info-pair">\u2014</span>
       </div>
       <div class="info-row">
         <span class="info-key">Network</span>
@@ -741,7 +719,7 @@ const HTML = `<!DOCTYPE html>
     </div>
     <div class="feed" id="feed">
       <div class="empty">
-        <div class="empty-icon">⬡</div>
+        <div class="empty-icon">\u2B21</div>
         <div>Waiting for agent data...</div>
         <div style="font-size:10px; margin-top:4px;">Run <code>npm run run-agent</code> in another terminal</div>
       </div>
@@ -751,12 +729,12 @@ const HTML = `<!DOCTYPE html>
 </div>
 
 <script>
-const fmt = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = n => n == null ? '\u2014' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtTime = ts => {
   const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts);
   return d.toLocaleTimeString('en-US', { hour12: false });
 };
-const truncate = (s, n=16) => s ? s.slice(0, 6) + '...' + s.slice(-4) : '—';
+const truncate = (s, n=16) => s ? s.slice(0, 6) + '...' + s.slice(-4) : '\u2014';
 
 let prevPrice = null;
 let priceHistory = [];
@@ -765,7 +743,7 @@ async function loadStatus() {
   try {
     const r = await fetch('/api/status');
     const s = await r.json();
-    document.getElementById('info-agent-id').textContent = s.agentId ?? '—';
+    document.getElementById('info-agent-id').textContent = s.agentId ?? '\u2014';
     document.getElementById('info-pair').textContent = s.pair ?? 'XBTUSD';
 
     const badge = document.getElementById('mode-badge');
@@ -816,7 +794,7 @@ async function loadCheckpoints() {
       document.getElementById('info-wallet').textContent = truncate(latest.signerAddress);
     }
 
-    document.getElementById('decision-reasoning').textContent = latest.reasoning ?? '—';
+    document.getElementById('decision-reasoning').textContent = latest.reasoning ?? '\u2014';
 
     const feed = document.getElementById('feed');
     feed.innerHTML = cps.map(cp => {
@@ -830,7 +808,7 @@ async function loadCheckpoints() {
           </div>
           <div class="card-body">
             <div class="card-price">\${fmt(cp.priceUsd)}</div>
-            <div class="card-reasoning" title="\${(cp.reasoning||'').replace(/"/g,'&quot;')}">\${cp.reasoning ?? '—'}</div>
+            <div class="card-reasoning" title="\${(cp.reasoning||'').replace(/"/g,'&quot;')}">\${cp.reasoning ?? '\u2014'}</div>
             <div class="card-confidence">
               <div class="confidence-bar-bg">
                 <div class="confidence-bar-fill" style="width:\${conf}%; background:\${barColor}"></div>
@@ -904,36 +882,28 @@ window.addEventListener('resize', drawChart);
 </script>
 </body>
 </html>`;
-
 app.get("/", (_req, res) => res.send(HTML));
-
-// ─── HTTP + WebSocket server ──────────────────────────────────────────────────
-
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: "/ws" });
-
-function broadcast(data: object) {
+const wss = new import_ws.WebSocketServer({ server, path: "/ws" });
+function broadcast(data) {
   const msg = JSON.stringify(data);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(msg);
+  wss.clients.forEach((client) => {
+    if (client.readyState === import_ws.WebSocket.OPEN) client.send(msg);
   });
 }
-
-// ─── File watcher — push new checkpoints to connected WS clients ──────────────
-
-// Initialise to end-of-file so we only broadcast checkpoints written *after* the
-// server starts. Historical data is served via REST (/api/decisions etc.).
 let lastByteOffset = (() => {
-  try { return fs.existsSync(CHECKPOINTS_FILE) ? fs.statSync(CHECKPOINTS_FILE).size : 0; } catch { return 0; }
+  try {
+    return fs.existsSync(CHECKPOINTS_FILE) ? fs.statSync(CHECKPOINTS_FILE).size : 0;
+  } catch {
+    return 0;
+  }
 })();
-
 function pollCheckpointFile() {
   try {
     if (!fs.existsSync(CHECKPOINTS_FILE)) {
-      setTimeout(pollCheckpointFile, 2000);
+      setTimeout(pollCheckpointFile, 2e3);
       return;
     }
-
     const stat = fs.statSync(CHECKPOINTS_FILE);
     if (stat.size > lastByteOffset) {
       const fd = fs.openSync(CHECKPOINTS_FILE, "r");
@@ -942,44 +912,40 @@ function pollCheckpointFile() {
       fs.readSync(fd, buf, 0, newBytes, lastByteOffset);
       fs.closeSync(fd);
       lastByteOffset = stat.size;
-
       const newLines = buf.toString("utf8").trim().split("\n").filter(Boolean);
-      const allCps   = readCheckpoints();
-
+      const allCps = readCheckpoints();
       for (const line of newLines) {
         try {
           const cp = JSON.parse(line);
           const idx = allCps.length - 1;
-
           broadcast({ type: "decision", data: toDecision(cp, idx) });
-          broadcast({ type: "proof",    data: toProof(cp, idx) });
+          broadcast({ type: "proof", data: toProof(cp, idx) });
           broadcast({
             type: "log",
             data: {
-              id:        `log-${cp.timestamp}`,
-              timestamp: new Date((cp.timestamp as number) * 1000).toLocaleTimeString("en-US", { hour12: false }),
-              message:   `${cp.action} · ${normalizePair(cp.pair ?? "BTCUSD")} @ $${Number(cp.priceUsd ?? 0).toLocaleString()} · confidence ${Math.round((cp.confidence ?? 0.5) * 100)}%`,
-            },
+              id: `log-${cp.timestamp}`,
+              timestamp: new Date(cp.timestamp * 1e3).toLocaleTimeString("en-US", { hour12: false }),
+              message: `${cp.action} \xB7 ${normalizePair(cp.pair ?? "BTCUSD")} @ $${Number(cp.priceUsd ?? 0).toLocaleString()} \xB7 confidence ${Math.round((cp.confidence ?? 0.5) * 100)}%`
+            }
           });
-        } catch { /* skip malformed lines */ }
+        } catch {
+        }
       }
-      // Broadcast reputation once after processing all new lines (avoids O(n²) on large files)
       if (newLines.length > 0) {
         broadcast({ type: "reputation", data: computeReputation(allCps) });
       }
     }
-  } catch { /* file may not exist yet */ }
-
-  setTimeout(pollCheckpointFile, 2000);
+  } catch {
+  }
+  setTimeout(pollCheckpointFile, 2e3);
 }
-
-// ─── Start ────────────────────────────────────────────────────────────────────
-
 server.listen(PORT, () => {
-  console.log(`\n  Dashboard  → http://localhost:${PORT}`);
-  console.log(`  REST API   → http://localhost:${PORT}/api/decisions  (and /proofs, /reputation, /status)`);
-  console.log(`  WebSocket  → ws://localhost:${PORT}/ws`);
-  console.log(`\n  Run "npm run run-agent" in another terminal to feed it data.\n`);
-  // Start file polling after server is up (avoids blocking server.listen on Windows file locks)
+  console.log(`
+  Dashboard  \u2192 http://localhost:${PORT}`);
+  console.log(`  REST API   \u2192 http://localhost:${PORT}/api/decisions  (and /proofs, /reputation, /status)`);
+  console.log(`  WebSocket  \u2192 ws://localhost:${PORT}/ws`);
+  console.log(`
+  Run "npm run run-agent" in another terminal to feed it data.
+`);
   setTimeout(pollCheckpointFile, 500);
 });
