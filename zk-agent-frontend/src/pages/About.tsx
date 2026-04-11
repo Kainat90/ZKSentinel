@@ -1,4 +1,4 @@
-import { ExternalLink, Linkedin, Globe, ShieldCheck, Cpu, BarChart3, Database, Fingerprint } from 'lucide-react';
+import { ExternalLink, ShieldCheck, Cpu, BarChart3, Database, Fingerprint } from 'lucide-react';
 import { Card } from '../components/Card';
 
 const pillars = [
@@ -42,7 +42,7 @@ const team = [
     stack: ['TypeScript', 'Java', 'Spring Boot', 'ERC-8004', 'EIP-712'],
     links: [
       {
-        icon: Linkedin,
+        icon: ExternalLink,
         label: 'LinkedIn',
         href: 'https://linkedin.com/in/kainat-khan-4699012a7',
       },
@@ -60,7 +60,7 @@ const team = [
     stack: ['React', 'TypeScript', 'Node.js', 'AWS', 'Docker', 'Firebase'],
     links: [
       {
-        icon: Globe,
+        icon: ExternalLink,
         label: 'kelvinmomanyi.codes',
         href: 'https://kelvinmomanyi.codes',
       },
