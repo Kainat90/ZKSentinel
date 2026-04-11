@@ -957,16 +957,17 @@ function pollCheckpointFile() {
               message:   `${cp.action} · ${normalizePair(cp.pair ?? "BTCUSD")} @ $${Number(cp.priceUsd ?? 0).toLocaleString()} · confidence ${Math.round((cp.confidence ?? 0.5) * 100)}%`,
             },
           });
-          broadcast({ type: "reputation", data: computeReputation(allCps) });
         } catch { /* skip malformed lines */ }
+      }
+      // Broadcast reputation once after processing all new lines (avoids O(n²) on large files)
+      if (newLines.length > 0) {
+        broadcast({ type: "reputation", data: computeReputation(allCps) });
       }
     }
   } catch { /* file may not exist yet */ }
 
   setTimeout(pollCheckpointFile, 2000);
 }
-
-pollCheckpointFile();
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
@@ -975,4 +976,6 @@ server.listen(PORT, () => {
   console.log(`  REST API   → http://localhost:${PORT}/api/decisions  (and /proofs, /reputation, /status)`);
   console.log(`  WebSocket  → ws://localhost:${PORT}/ws`);
   console.log(`\n  Run "npm run run-agent" in another terminal to feed it data.\n`);
+  // Start file polling after server is up (avoids blocking server.listen on Windows file locks)
+  setTimeout(pollCheckpointFile, 500);
 });
