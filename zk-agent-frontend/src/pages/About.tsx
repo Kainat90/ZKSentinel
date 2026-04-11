@@ -1,4 +1,4 @@
-import { Github, Linkedin, Globe, ShieldCheck, Cpu, BarChart3, Database, Fingerprint } from 'lucide-react';
+import { ExternalLink, Linkedin, Globe, ShieldCheck, Cpu, BarChart3, Database, Fingerprint } from 'lucide-react';
 import { Card } from '../components/Card';
 
 const pillars = [
@@ -382,7 +382,7 @@ export function About() {
           onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--brand-700)')}
           onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-primary)')}
         >
-          <Github size={14} />
+          <ExternalLink size={14} />
           github.com/Kainat90/ZKSentinel
         </a>
       </Card>
