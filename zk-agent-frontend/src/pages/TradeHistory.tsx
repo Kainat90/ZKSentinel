@@ -108,8 +108,9 @@ export function TradeHistory() {
             <ResponsiveContainer width="100%" height={120}>
               <AreaChart
                 data={chartData}
-                onMouseMove={(state: { activePayload?: { value: number }[] }) => {
-                  if (state.activePayload?.length) setActiveValue(state.activePayload[0].value);
+                onMouseMove={(state: unknown) => {
+                  const s = state as { activePayload?: { value: number }[] };
+                  if (s.activePayload?.length) setActiveValue(s.activePayload[0].value);
                 }}
                 onMouseLeave={() => setActiveValue(null)}
               >

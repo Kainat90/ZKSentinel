@@ -3,7 +3,7 @@ import type { Decision, Proof, LogEntry, ReputationData } from '../types';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useAgentData } from '../hooks/useAgentData';
 
-function dedupe<T extends Record<string, unknown>>(arr: T[], key: keyof T): T[] {
+function dedupe<T>(arr: T[], key: keyof T): T[] {
   const seen = new Set();
   return arr.filter(item => {
     if (seen.has(item[key])) return false;
