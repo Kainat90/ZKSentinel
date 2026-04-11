@@ -80,22 +80,27 @@ let onChainScore = 0;
 let onChainFeedbackCount = 0;
 
 async function refreshOnChainReputation() {
-  const rpcUrl      = process.env.SEPOLIA_RPC_URL;
+  const rpcUrl       = process.env.SEPOLIA_RPC_URL;
   const registryAddr = process.env.REPUTATION_REGISTRY_ADDRESS;
-  const agentId     = process.env.AGENT_ID;
+  const agentId      = process.env.AGENT_ID;
   if (!rpcUrl || !registryAddr || !agentId) return;
   try {
-    const provider  = new ethers.JsonRpcProvider(rpcUrl);
-    const contract  = new ethers.Contract(registryAddr, REPUTATION_ABI, provider);
-    const summary   = await contract.reputation(BigInt(agentId));
+    // staticNetwork skips auto-detection (prevents retry spam on slow RPCs)
+    const network  = ethers.Network.from(11155111); // Sepolia
+    const provider = new ethers.JsonRpcProvider(rpcUrl, network, { staticNetwork: network });
+    // Race the contract call against a 8-second timeout
+    const summary = await Promise.race([
+      (new ethers.Contract(registryAddr, REPUTATION_ABI, provider)).reputation(BigInt(agentId)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+    ]) as { totalScore: bigint; feedbackCount: bigint };
     onChainFeedbackCount = Number(summary.feedbackCount);
     onChainScore = onChainFeedbackCount > 0
       ? Math.round(Number(summary.totalScore) / onChainFeedbackCount)
       : 0;
-  } catch { /* RPC unavailable — keep cached value */ }
+  } catch { /* RPC unavailable or timed out — keep cached value, no log spam */ }
 }
-// Refresh immediately on start, then every 5 minutes
-refreshOnChainReputation();
+// Delay first fetch by 10s to let the server fully start, then every 5 minutes
+setTimeout(refreshOnChainReputation, 10_000);
 setInterval(refreshOnChainReputation, 300_000);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
