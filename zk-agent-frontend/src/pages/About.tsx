@@ -73,8 +73,8 @@ const team = [
     ],
     stack: ['React', 'TypeScript', 'Vite', 'Node.js', 'Express', 'Nginx'],
     links: [
-      { icon: GitHubIcon,   label: 'GitHub',              href: 'https://github.com/kelvinmomanyi' },
-      { icon: LinkedInIcon, label: 'LinkedIn',             href: 'https://linkedin.com/in/kelvin-momanyi' },
+      { icon: GitHubIcon,   label: 'GitHub',              href: 'https://github.com/okmomnyi' },
+      { icon: LinkedInIcon, label: 'LinkedIn',             href: 'https://www.linkedin.com/in/kelvin-momanyi/' },
       { icon: ExternalLink, label: 'kelvinmomanyi.codes',  href: 'https://kelvinmomanyi.codes' },
     ],
   },
