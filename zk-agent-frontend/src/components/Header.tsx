@@ -28,7 +28,7 @@ export function Header() {
           style={{ width: 32, height: 32, flexShrink: 0 }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: '#FFFFFF', lineHeight: 1.4 }}>
+          <span className="header-title" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: '#FFFFFF', lineHeight: 1.4 }}>
             ZKSentinel Trading Agent
           </span>
           <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
@@ -39,7 +39,7 @@ export function Header() {
 
       {/* Right */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{
+        <span className="header-network-pill" style={{
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 500,
           fontSize: 11,

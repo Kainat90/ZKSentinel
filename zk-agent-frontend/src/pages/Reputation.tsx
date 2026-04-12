@@ -182,7 +182,8 @@ export function Reputation() {
       <Card>
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 13, color: 'var(--text-primary)', marginBottom: 12 }}>Registry contracts</div>
         <div style={{ border: '0.5px solid var(--border-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-scroll">
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 360 }}>
             <tbody>
               {[
                 { name: 'AgentRegistry',      addr: import.meta.env.VITE_AGENT_REGISTRY_ADDRESS      || '—' },
@@ -210,6 +211,7 @@ export function Reputation() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </Card>
     </div>

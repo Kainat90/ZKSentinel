@@ -138,7 +138,7 @@ export function TradeHistory() {
       </Card>
 
       {/* Filter bar */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div className="filter-bar" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         {(['All', 'BUY', 'SELL', 'HOLD'] as const).map(f => (
           <button key={f} style={pillStyle(filter === f)} onClick={() => setFilter(f)}>{f}</button>
         ))}
@@ -159,7 +159,8 @@ export function TradeHistory() {
             {decisions.length === 0 ? 'No trades yet — start the agent to see trade history' : 'No trades match the current filter'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-scroll">
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
             <thead>
               <tr style={{ background: 'var(--bg-secondary)', height: 38, borderBottom: '0.5px solid var(--border-primary)' }}>
                 {['Time', 'Pair', 'Action', 'Amount', 'Price', 'EIP-712 Proof', 'PnL', 'Checkpoint'].map(col => (
@@ -205,6 +206,7 @@ export function TradeHistory() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -215,7 +217,7 @@ export function TradeHistory() {
             onClick={() => setSelected(null)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 199 }}
           />
-          <div style={{
+          <div className="detail-drawer" style={{
             position: 'fixed', right: 0, top: 54, bottom: 0,
             width: 380,
             background: 'var(--bg-primary)',

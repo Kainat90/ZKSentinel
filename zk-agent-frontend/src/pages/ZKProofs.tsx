@@ -54,7 +54,7 @@ export function Proofs() {
         <MetricCard label="Pass rate" value={<span style={{ color: 'var(--brand-700)' }}>{passRate}%</span>} />
       </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+      <div className="filter-bar" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
         {(['All', 'PASS', 'FAIL'] as const).map(f => (
           <button key={f} style={pillStyle(filter === f)} onClick={() => setFilter(f)}>{f}</button>
         ))}
@@ -86,7 +86,8 @@ export function Proofs() {
             {proofs.length === 0 ? 'No proofs yet — start the agent to generate proofs' : 'No proofs match the current filter'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-scroll">
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 540 }}>
             <thead>
               <tr style={{ background: 'var(--bg-secondary)', height: 38, borderBottom: '0.5px solid var(--border-primary)' }}>
                 {['Status', 'Proof Hash', 'Decision', 'Rule', 'Timestamp', 'On-chain'].map(col => (
@@ -139,6 +140,7 @@ export function Proofs() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

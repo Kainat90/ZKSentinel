@@ -98,3 +98,42 @@ code {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ── Filter bars: wrap search input to new line ── */
+@media (max-width: 768px) {
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+  .filter-bar input {
+    margin-left: 0 !important;
+    flex: 1 1 100%;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+}
+
+/* ── Header: hide less critical elements on narrow screens ── */
+@media (max-width: 580px) {
+  .header-network-pill {
+    display: none !important;
+  }
+  .header-title {
+    font-size: 13px !important;
+  }
+}
+
+/* ── Tables: horizontal scroll wrapper ── */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Drawers: full width on mobile ── */
+@media (max-width: 768px) {
+  .detail-drawer {
+    width: 100% !important;
+    max-width: 100vw !important;
+    border-left: none !important;
+    border-top: 0.5px solid var(--border-primary) !important;
+  }
+}
