@@ -187,12 +187,34 @@ function toDecisionList(checkpoints: any[]) {
 /** Compute reputation stats from all checkpoints, blending on-chain score when available */
 function computeReputation(checkpoints: any[]) {
   const trades = checkpoints.filter(cp => cp.action !== "HOLD");
-  const buys   = checkpoints.filter(cp => cp.action === "BUY").length;
   const total  = checkpoints.length;
-  const winRate = total > 0 ? Math.round((buys / total) * 100) : 0;
-  const score   = Math.min(900, 500 + Math.round(winRate * 2) + Math.min(trades.length * 2, 200));
 
-  // Score history — one entry per day, running accumulation
+  // Win rate — profitable non-HOLD trades / total non-HOLD trades
+  // A BUY is profitable when the next price is higher; a SELL when it's lower.
+  let profitableCount = 0;
+  for (let i = 0; i < checkpoints.length; i++) {
+    const cp = checkpoints[i];
+    if (cp.action !== "HOLD" && cp.amountUsd > 0 && i + 1 < checkpoints.length) {
+      const next = checkpoints[i + 1];
+      const pct  = cp.priceUsd > 0 ? (next.priceUsd - cp.priceUsd) / cp.priceUsd : 0;
+      if ((cp.action === "BUY" && pct > 0) || (cp.action === "SELL" && pct < 0)) profitableCount++;
+    }
+  }
+  const winRate = trades.length > 0 ? Math.round((profitableCount / trades.length) * 100) : 0;
+
+  // Off-chain score on 0–100 scale to match the on-chain contract (uint8, 1–100).
+  //   Base 50  +  up to 25 from win rate  +  up to 15 from trade volume  +  up to 10 from proof coverage
+  const proofSuccessRateEarly = total > 0
+    ? Math.round((checkpoints.filter(cp => !!cp.signature).length / total) * 100)
+    : 0;
+  const score = Math.min(100, Math.round(
+    50
+    + winRate * 0.25
+    + Math.min(trades.length, 40) * 0.375
+    + proofSuccessRateEarly * 0.1,
+  ));
+
+  // Score history — one entry per day, running accumulation on 0–100 scale
   const byDay: Record<string, number[]> = {};
   checkpoints.forEach(cp => {
     const day = new Date((cp.timestamp as number) * 1000).toLocaleDateString("en-US", {
@@ -201,10 +223,10 @@ function computeReputation(checkpoints: any[]) {
     if (!byDay[day]) byDay[day] = [];
     byDay[day].push(cp.confidence ?? 0.5);
   });
-  let running = 500;
+  let running = 50;
   const history = Object.entries(byDay).slice(-14).map(([date, confs]) => {
     const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
-    running = Math.round(running + avg * 10);
+    running = Math.min(100, Math.round(running + avg * 2));
     return { date, score: running };
   });
 
@@ -245,9 +267,8 @@ function computeReputation(checkpoints: any[]) {
   }
   const avgRoi = roiCount > 0 ? parseFloat((totalRoi / roiCount).toFixed(2)) : 0;
 
-  // Proof success rate — ratio of checkpoints with a valid signature (EIP-712)
-  const signedCount = checkpoints.filter(cp => !!cp.signature).length;
-  const proofSuccessRate = total > 0 ? Math.round((signedCount / total) * 100) : 0;
+  // Proof success rate — ratio of checkpoints with a valid EIP-712 signature
+  const proofSuccessRate = proofSuccessRateEarly;
 
   // Agent age
   const firstTs  = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1].timestamp as number : Date.now() / 1000;
