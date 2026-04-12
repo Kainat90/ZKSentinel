@@ -12,11 +12,11 @@ import { AgentDataProvider, useAgentContext } from './context/AgentDataContext';
 import './styles/global.css';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Sentinel — Dashboard',
-  '/proofs': 'Sentinel — EIP-712 Proofs',
-  '/trade-history': 'Sentinel — Trade History',
-  '/reputation': 'Sentinel — Reputation',
-  '/about': 'Sentinel — About',
+  '/': 'ZKSentinel — Dashboard',
+  '/proofs': 'ZKSentinel — EIP-712 Proofs',
+  '/trade-history': 'ZKSentinel — Trade History',
+  '/reputation': 'ZKSentinel — Reputation',
+  '/about': 'ZKSentinel — About',
 };
 
 function AppContent() {
@@ -24,7 +24,7 @@ function AppContent() {
   const { connected } = useAgentContext();
 
   React.useEffect(() => {
-    document.title = PAGE_TITLES[location.pathname] || 'Sentinel';
+    document.title = PAGE_TITLES[location.pathname] || 'ZKSentinel';
   }, [location.pathname]);
 
   return (

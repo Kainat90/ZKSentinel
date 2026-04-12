@@ -138,7 +138,7 @@ export function Sidebar() {
             </span>
           </div>
           <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
-            Sentinel Strategy
+            ZKSentinel Strategy
           </span>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
             Uptime: {uptime}

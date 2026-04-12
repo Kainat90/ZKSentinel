@@ -67,10 +67,10 @@ export function Dashboard() {
     <div className="page-fade" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Brand header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <img src={logoMark} alt="Sentinel" style={{ width: 44, height: 44 }} />
+        <img src={logoMark} alt="ZKSentinel" style={{ width: 44, height: 44 }} />
         <div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 16, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-            Sentinel
+            ZKSentinel
           </div>
           <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'var(--text-tertiary)' }}>
             Autonomous trading agent · Sepolia testnet

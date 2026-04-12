@@ -81,7 +81,7 @@ export function About() {
           color: 'var(--text-primary)',
           marginBottom: 4,
         }}>
-          About Sentinel
+          About ZKSentinel
         </h1>
         <p style={{
           fontFamily: "'DM Sans', sans-serif",
@@ -89,7 +89,7 @@ export function About() {
           fontSize: 13,
           color: 'var(--text-tertiary)',
         }}>
-          Trustless · Verifiable · Secure — AI Trading Infrastructure · v1.1.0
+          Trustless · Verifiable · Secure — ZKSentinel AI Trading Infrastructure · v1.1.0
         </p>
       </div>
 
@@ -114,7 +114,7 @@ export function About() {
             maxWidth: 620,
           }}>
             Billions of dollars flow through AI trading agents every day — yet nobody can verify what
-            they are actually doing. Sentinel is the first framework to treat every agent decision as a
+            they are actually doing. ZKSentinel is the first framework to treat every agent decision as a
             first-class on-chain artifact, backed by cryptographic proof at the protocol level, not in
             application code.
           </p>
@@ -129,7 +129,7 @@ export function About() {
             fontSize: 13,
             color: 'var(--brand-800)',
           }}>
-            Every AI agent economy needs a trust primitive. Sentinel is that primitive.
+            Every AI agent economy needs a trust primitive. ZKSentinel is that primitive.
           </div>
         </div>
       </Card>
@@ -207,7 +207,7 @@ export function About() {
           color: 'var(--text-tertiary)',
           marginBottom: 10,
         }}>
-          Two engineers, one vision — built Sentinel from scratch.
+          Two engineers, one vision — built ZKSentinel from scratch.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {team.map(({ name, role, avatar, contributions, stack, links }) => (
@@ -355,7 +355,7 @@ export function About() {
             margin: 0,
             lineHeight: 1.5,
           }}>
-            The Sentinel repository is public. The codebase implements ERC-8004, EIP-712,
+            The ZKSentinel repository is public. The codebase implements ERC-8004, EIP-712,
             multi-source data ingestion, and the full backtesting engine.
           </p>
         </div>

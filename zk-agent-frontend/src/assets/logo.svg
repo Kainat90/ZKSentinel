@@ -26,17 +26,17 @@
   <rect x="88"  y="170" width="7" height="7" rx="1" transform="rotate(45 91.5 173.5)" fill="rgba(255,255,255,0.5)"/>
   <rect x="100" y="170" width="7" height="7" rx="1" transform="rotate(45 103.5 173.5)" fill="rgba(255,255,255,0.5)"/>
   <rect x="112" y="170" width="7" height="7" rx="1" transform="rotate(45 115.5 173.5)" fill="rgba(255,255,255,0.5)"/>
-  <!-- SENTINEL text -->
+  <!-- ZKSENTINEL text -->
   <text
     x="100"
     y="216"
     text-anchor="middle"
     font-family="'DM Sans', Arial, sans-serif"
     font-weight="700"
-    font-size="18"
+    font-size="15"
     fill="#7B1828"
-    letter-spacing="2"
-  ><tspan fill="#1a1a1a">SENTINEL</tspan></text>
+    letter-spacing="1.5"
+  ><tspan fill="#1a1a1a">ZKSENTINEL</tspan></text>
   <!-- Tagline -->
   <text
     x="100"

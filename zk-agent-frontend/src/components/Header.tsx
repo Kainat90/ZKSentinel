@@ -24,12 +24,12 @@ export function Header() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <img
           src={logoMark}
-          alt="Sentinel"
+          alt="ZKSentinel"
           style={{ width: 32, height: 32, flexShrink: 0 }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500, fontSize: 15, color: '#FFFFFF', lineHeight: 1.4 }}>
-            Sentinel Trading Agent
+            ZKSentinel Trading Agent
           </span>
           <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 400, fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
             agentId: #0x7f3a…e921
