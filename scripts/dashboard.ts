@@ -356,6 +356,17 @@ app.get("/api/reputation", (_req, res) => {
   res.json(computeReputation(all));
 });
 
+const STATS_FILE = path.join(process.cwd(), "trade_stats.json");
+
+app.get("/api/stats", (_req, res) => {
+  if (!fs.existsSync(STATS_FILE)) return res.json(null);
+  try {
+    res.json(JSON.parse(fs.readFileSync(STATS_FILE, "utf8")));
+  } catch {
+    res.json(null);
+  }
+});
+
 // ─── HTML (embedded legacy dashboard — runs alongside React frontend) ─────────
 
 const HTML = `<!DOCTYPE html>
@@ -827,6 +838,30 @@ const HTML = `<!DOCTYPE html>
       </div>
     </div>
 
+    <div class="agent-info">
+      <div class="panel-header" style="padding: 0 0 10px; border: none;">Trade Stats</div>
+      <div class="info-row">
+        <span class="info-key">Total Trades</span>
+        <span class="info-value accent" id="stats-total">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Wins / Losses</span>
+        <span class="info-value" id="stats-wl">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Win Rate</span>
+        <span class="info-value" id="stats-winrate">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Total PnL</span>
+        <span class="info-value" id="stats-pnl">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-key">Avg ROI</span>
+        <span class="info-value" id="stats-roi">—</span>
+      </div>
+    </div>
+
     <div class="panel chart-panel">
       <canvas id="price-chart"></canvas>
     </div>
@@ -997,9 +1032,31 @@ function drawChart() {
   ctx.fill();
 }
 
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const s = await r.json();
+    if (!s) return;
+    document.getElementById('stats-total').textContent = s.totalTrades ?? '—';
+    document.getElementById('stats-wl').textContent =
+      s.wins != null ? s.wins + 'W / ' + s.losses + 'L' : '—';
+    document.getElementById('stats-winrate').textContent =
+      s.winRatePct != null ? s.winRatePct.toFixed(1) + '%' : '—';
+    const pnlEl = document.getElementById('stats-pnl');
+    if (s.totalPnlUsd != null) {
+      pnlEl.textContent = (s.totalPnlUsd >= 0 ? '+' : '') + '$' + s.totalPnlUsd.toFixed(2);
+      pnlEl.style.color = s.totalPnlUsd > 0 ? 'var(--buy)' : s.totalPnlUsd < 0 ? 'var(--sell)' : '';
+    }
+    document.getElementById('stats-roi').textContent =
+      s.avgRoiPct != null ? (s.avgRoiPct >= 0 ? '+' : '') + s.avgRoiPct.toFixed(3) + '%' : '—';
+  } catch(e) {}
+}
+
 loadStatus();
 loadCheckpoints();
+loadStats();
 setInterval(loadCheckpoints, 5000);
+setInterval(loadStats, 30000);
 window.addEventListener('resize', drawChart);
 </script>
 </body>
