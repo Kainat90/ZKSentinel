@@ -19,6 +19,8 @@ export interface MarketData {
   high: number;       // 24h high
   low: number;        // 24h low
   timestamp: number;  // Unix timestamp (ms)
+  recentVolumes: number[]; // Last 20 candle volumes for spike detection
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +35,8 @@ export interface TradeDecision {
   pair: string;        // e.g. "XBTUSD"
   amount: number;      // In USD
   confidence: number;  // 0.0 – 1.0
-  reasoning: string;   // Plain-language explanation of the decision
+  reasoning: string;
+       // Plain-language explanation of the decision
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,6 +49,7 @@ export interface TradingStrategy {
    * This is the only method you need to implement to plug in your own model.
    */
   analyze(data: MarketData): Promise<TradeDecision>;
+  
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

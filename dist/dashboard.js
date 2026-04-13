@@ -21,22 +21,86 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
-var dotenv = __toESM(require("dotenv"));
-var import_express = __toESM(require("express"));
-var fs = __toESM(require("fs"));
-var path = __toESM(require("path"));
-var http = __toESM(require("http"));
+var dotenv = __toESM(require("dotenv"), 1);
+var import_express = __toESM(require("express"), 1);
+var fs = __toESM(require("fs"), 1);
+var path = __toESM(require("path"), 1);
+var http = __toESM(require("http"), 1);
 var import_ws = require("ws");
+var import_ethers = require("ethers");
 dotenv.config();
 const app = (0, import_express.default)();
 const PORT = process.env.DASHBOARD_PORT || 3e3;
 const CHECKPOINTS_FILE = path.join(process.cwd(), "checkpoints.jsonl");
-app.use((_req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+const ALLOWED_ORIGINS = /* @__PURE__ */ new Set([
+  "http://localhost:5173",
+  // Vite dev server
+  "http://localhost:5174",
+  "http://164.92.173.167",
+  // Production IP
+  `http://164.92.173.167:${process.env.DASHBOARD_PORT ?? 3001}`
+]);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
   next();
 });
+const rateLimitMap = /* @__PURE__ */ new Map();
+app.use((req, res, next) => {
+  const ip = req.ip ?? "unknown";
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 6e4 });
+  } else {
+    entry.count++;
+    if (entry.count > 100) {
+      res.status(429).json({ error: "Too many requests \u2014 limit is 100 req/min" });
+      return;
+    }
+  }
+  next();
+});
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now > entry.resetAt) rateLimitMap.delete(ip);
+  }
+}, 3e5);
+const REPUTATION_ABI = [
+  "function getAverageScore(uint256 agentId) external view returns (uint256)",
+  "function reputation(uint256 agentId) external view returns (uint256 totalScore, uint256 feedbackCount, uint256 lastUpdated)"
+];
+let onChainScore = 0;
+let onChainFeedbackCount = 0;
+async function refreshOnChainReputation() {
+  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  const registryAddr = process.env.REPUTATION_REGISTRY_ADDRESS;
+  const agentId = process.env.AGENT_ID;
+  if (!rpcUrl || !registryAddr || !agentId) return;
+  try {
+    const network = import_ethers.ethers.Network.from(11155111);
+    const provider = new import_ethers.ethers.JsonRpcProvider(rpcUrl, network, { staticNetwork: network });
+    const summary = await Promise.race([
+      new import_ethers.ethers.Contract(registryAddr, REPUTATION_ABI, provider).reputation(BigInt(agentId)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8e3))
+    ]);
+    onChainFeedbackCount = Number(summary.feedbackCount);
+    onChainScore = onChainFeedbackCount > 0 ? Math.round(Number(summary.totalScore) / onChainFeedbackCount) : 0;
+  } catch {
+  }
+}
+setTimeout(refreshOnChainReputation, 1e4);
+setInterval(refreshOnChainReputation, 3e5);
 function readCheckpoints() {
   if (!fs.existsSync(CHECKPOINTS_FILE)) return [];
   const raw = fs.readFileSync(CHECKPOINTS_FILE, "utf8").trim();
@@ -110,10 +174,21 @@ function toDecisionList(checkpoints) {
 }
 function computeReputation(checkpoints) {
   const trades = checkpoints.filter((cp) => cp.action !== "HOLD");
-  const buys = checkpoints.filter((cp) => cp.action === "BUY").length;
   const total = checkpoints.length;
-  const winRate = total > 0 ? Math.round(buys / total * 100) : 0;
-  const score = Math.min(900, 500 + Math.round(winRate * 2) + Math.min(trades.length * 2, 200));
+  let profitableCount = 0;
+  for (let i = 0; i < checkpoints.length; i++) {
+    const cp = checkpoints[i];
+    if (cp.action !== "HOLD" && cp.amountUsd > 0 && i + 1 < checkpoints.length) {
+      const next = checkpoints[i + 1];
+      const pct = cp.priceUsd > 0 ? (next.priceUsd - cp.priceUsd) / cp.priceUsd : 0;
+      if (cp.action === "BUY" && pct > 0 || cp.action === "SELL" && pct < 0) profitableCount++;
+    }
+  }
+  const winRate = trades.length > 0 ? Math.round(profitableCount / trades.length * 100) : 0;
+  const proofSuccessRateEarly = total > 0 ? Math.round(checkpoints.filter((cp) => !!cp.signature).length / total * 100) : 0;
+  const score = Math.min(100, Math.round(
+    50 + winRate * 0.25 + Math.min(trades.length, 40) * 0.375 + proofSuccessRateEarly * 0.1
+  ));
   const byDay = {};
   checkpoints.forEach((cp) => {
     const day = new Date(cp.timestamp * 1e3).toLocaleDateString("en-US", {
@@ -123,10 +198,10 @@ function computeReputation(checkpoints) {
     if (!byDay[day]) byDay[day] = [];
     byDay[day].push(cp.confidence ?? 0.5);
   });
-  let running = 500;
+  let running = 50;
   const history = Object.entries(byDay).slice(-14).map(([date, confs]) => {
     const avg = confs.reduce((a, b) => a + b, 0) / confs.length;
-    running = Math.round(running + avg * 10);
+    running = Math.min(100, Math.round(running + avg * 2));
     return { date, score: running };
   });
   const wlByDay = {};
@@ -162,15 +237,18 @@ function computeReputation(checkpoints) {
     }
   }
   const avgRoi = roiCount > 0 ? parseFloat((totalRoi / roiCount).toFixed(2)) : 0;
-  const signedCount = checkpoints.filter((cp) => !!cp.signature).length;
-  const proofSuccessRate = total > 0 ? Math.round(signedCount / total * 100) : 0;
+  const proofSuccessRate = proofSuccessRateEarly;
   const firstTs = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1].timestamp : Date.now() / 1e3;
   const ageSecs = Date.now() / 1e3 - firstTs;
   const ageDays = Math.floor(ageSecs / 86400);
   const ageHours = Math.floor(ageSecs / 3600);
   const agentAge = ageDays > 0 ? `${ageDays} day${ageDays !== 1 ? "s" : ""}` : `${ageHours}h`;
+  const displayScore = onChainFeedbackCount > 0 ? onChainScore : score;
   return {
-    score,
+    score: displayScore,
+    onChainScore: onChainFeedbackCount > 0 ? onChainScore : null,
+    onChainFeedbackCount,
+    offChainEstimate: score,
     avgRoi,
     proofSuccessRate,
     winRate,
