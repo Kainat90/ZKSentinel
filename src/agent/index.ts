@@ -20,18 +20,13 @@ import { generateCheckpoint } from "../explainability/checkpoint";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SEPOLIA_CHAIN_ID = 11155111;
-const TRADING_PAIR    = process.env.TRADING_PAIR || "BTCUSD";
+const TRADING_PAIR     = process.env.TRADING_PAIR || "BTCUSD";
+const POLL_INTERVAL    = parseInt(process.env.POLL_INTERVAL_MS || "60000");
 
-// 60s polling — checkpoints post frequently so reputation builds faster.
-// Override via POLL_INTERVAL_MS in .env if needed.
-const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL_MS || "60000");
+const CHECKPOINTS_FILE  = path.join(process.cwd(), "checkpoints.jsonl");
+const STATS_FILE        = path.join(process.cwd(), "trade_stats.json");
+const HOLD_INTENT_HASH  = ethers.ZeroHash;
 
-const CHECKPOINTS_FILE = path.join(process.cwd(), "checkpoints.jsonl");
-const HOLD_INTENT_HASH = ethers.ZeroHash;
-
-// 0.50 threshold — meaningful HOLDs post on-chain and grow reputation
-// even when strict RiskRouter guardrails block all trades.
-// Override via MIN_CHECKPOINT_CONFIDENCE in .env.
 const MIN_CHECKPOINT_CONFIDENCE = parseFloat(
   process.env.MIN_CHECKPOINT_CONFIDENCE || "0.50"
 );
@@ -44,32 +39,24 @@ function requireEnv(key: string): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Checkpoint scoring
-// Rules:
-//   - Warm-up HOLD          → 0   (no signal value)
-//   - RiskRouter BLOCKED    → 90  (agent correctly deferred to risk system)
-//   - BUY / SELL            → confidence * 100 (capped 0–100)
-//   - Meaningful HOLD       → confidence * 100 (capped 60–95)
 // ─────────────────────────────────────────────────────────────────────────────
 function computeCheckpointScore(decision: TradeDecision): number {
   if (decision.reasoning.startsWith("Warming up")) return 0;
   if (decision.reasoning.includes("BLOCKED by RiskRouter")) return 90;
-
   const baseScore = Math.round(decision.confidence * 100);
-
   if (decision.action === "BUY" || decision.action === "SELL") {
     return Math.min(100, Math.max(0, baseScore));
   }
-
   return Math.min(95, Math.max(60, baseScore));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Gate logic — what gets posted on-chain
-// NOTE: Separate from RiskRouter guardrails.
-//       Guardrails protect capital. This gate builds reputation.
-//       Even a BLOCKED trade posts score=90 and grows reputation.
+// Gate logic
 // ─────────────────────────────────────────────────────────────────────────────
-function shouldPostCheckpoint(decision: TradeDecision, isInPosition: boolean): boolean {
+function shouldPostCheckpoint(
+  decision: TradeDecision,
+  isInPosition: boolean
+): boolean {
   if (decision.action === "BUY" || decision.action === "SELL") return true;
   if (decision.reasoning.includes("BLOCKED by RiskRouter")) return true;
   if (decision.reasoning.startsWith("Warming up")) return false;
@@ -78,10 +65,48 @@ function shouldPostCheckpoint(decision: TradeDecision, isInPosition: boolean): b
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Persist trade stats to disk so dashboard can read them
+// ─────────────────────────────────────────────────────────────────────────────
+function persistStats(stats: ReturnType<VolumeConfirmedMomentumStrategy["getStats"]>): void {
+  try {
+    fs.writeFileSync(STATS_FILE, JSON.stringify({
+      ...stats,
+      // Friendly formatted fields for dashboard display
+      winRatePct:    parseFloat((stats.winRate * 100).toFixed(1)),
+      totalPnlUsd:   parseFloat(stats.totalPnlUsd.toFixed(2)),
+      avgRoiPct:     parseFloat(stats.avgRoiPct.toFixed(3)),
+      updatedAt:     new Date().toISOString(),
+    }, null, 2));
+  } catch (err) {
+    console.warn("[agent] Failed to persist trade stats:", err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Log a SELL decision's PnL prominently so it shows up in dashboard logs
+// ─────────────────────────────────────────────────────────────────────────────
+function logTradeOutcome(decision: TradeDecision & Record<string, unknown>): void {
+  if (decision.action !== "SELL") return;
+  const pnl    = decision["pnl"]    as number | undefined;
+  const roi    = decision["roiPct"] as number | undefined;
+  const isWin  = decision["isWin"]  as boolean | undefined;
+  const entry  = decision["entryPrice"] as number | undefined;
+  const exit   = decision["exitPrice"]  as number | undefined;
+
+  console.log("─".repeat(60));
+  console.log(`[TRADE CLOSED] ${isWin ? "✅ WIN" : "❌ LOSS"}`);
+  console.log(`  Pair:       ${decision.pair}`);
+  console.log(`  Entry:      $${entry?.toFixed(2) ?? "N/A"}`);
+  console.log(`  Exit:       $${exit?.toFixed(2) ?? "N/A"}`);
+  console.log(`  ROI:        ${roi?.toFixed(3) ?? "N/A"}%`);
+  console.log(`  PnL:        $${pnl?.toFixed(2) ?? "N/A"}`);
+  console.log("─".repeat(60));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Agent runner
 // ─────────────────────────────────────────────────────────────────────────────
-
-export async function runAgent(strategy: TradingStrategy) {
+export async function runAgent(strategy: VolumeConfirmedMomentumStrategy) {
   const rpcUrl            = requireEnv("SEPOLIA_RPC_URL");
   const privateKey        = requireEnv("PRIVATE_KEY");
   const registryAddress   = requireEnv("AGENT_REGISTRY_ADDRESS");
@@ -96,18 +121,18 @@ export async function runAgent(strategy: TradingStrategy) {
   const agentWallet    = new ethers.Wallet(agentWalletKey, provider);
 
   const agentId = await getAgentId(operatorSigner, registryAddress, {
-    name: "ZKSentinel",
+    name: "KSentinel",
     description:
       "Autonomous AI trading agent with ERC-8004 identity, volume-confirmed momentum strategy, and EIP-712 checkpoints",
     capabilities: ["trading", "analysis", "explainability", "eip712-signing"],
     agentWallet: agentWallet.address,
     agentURI: `data:application/json,${encodeURIComponent(
       JSON.stringify({
-        name: "ZKSentinel",
+        name: "KSentinel",
         description: "ERC-8004 compliant AI trading agent",
         capabilities: ["trading", "analysis", "eip712-signing"],
         agentWallet: agentWallet.address,
-        version: "1.1.0",
+        version: "2.0.0",
       })
     )}`,
   });
@@ -119,16 +144,17 @@ export async function runAgent(strategy: TradingStrategy) {
   const riskRouter = new RiskRouterClient(routerAddress, agentWallet, SEPOLIA_CHAIN_ID);
   const validation = new ValidationRegistryClient(validationAddress, agentWallet);
 
-  console.log(`\n[agent] Starting agent loop`);
+  console.log(`\n[agent] Starting KSentinel agent loop`);
   console.log(`[agent] agentId:                   ${agentId}`);
-  console.log(`[agent] Pair:                      ${TRADING_PAIR}`);
-  console.log(`[agent] Interval:                  ${POLL_INTERVAL / 1000}s`);
-  console.log(`[agent] Min checkpoint confidence: ${MIN_CHECKPOINT_CONFIDENCE * 100}%`);
-  console.log(`[agent] Checkpoints:               ${CHECKPOINTS_FILE}`);
-  console.log(`[agent] Market data:               CoinGecko (price) + Kraken (OHLCV volume)\n`);
-  console.log(`[agent] NOTE: RiskRouter guardrails are strict (trading protection).`);
-  console.log(`[agent]       Checkpoint gate is relaxed (reputation building).\n`);
+  console.log(`[agent] Pair:                       ${TRADING_PAIR}`);
+  console.log(`[agent] Interval:                   ${POLL_INTERVAL / 1000}s`);
+  console.log(`[agent] Min checkpoint confidence:  ${MIN_CHECKPOINT_CONFIDENCE * 100}%`);
+  console.log(`[agent] Checkpoints:                ${CHECKPOINTS_FILE}`);
+  console.log(`[agent] Trade stats:                ${STATS_FILE}`);
+  console.log(`[agent] Market data:                CoinGecko (price) + Kraken (OHLCV)\n`);
 
+  // isInPosition is now derived from strategy's internal state via the SELL signal
+  // to keep them in sync — we update it only when a BUY or SELL executes on-chain
   let isInPosition = false;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -136,28 +162,39 @@ export async function runAgent(strategy: TradingStrategy) {
   // ─────────────────────────────────────────────────────────────────────────
   const tick = async () => {
     try {
-      // 1. Fetch market data
-      //    CoinGecko → price, high_24h, low_24h
-      //    Kraken    → per-candle BTC volume, recentVolumes[], vwap
-      //    Both fetched in parallel inside getMarketSnapshot()
+      // 1. Market data
       const market = await getMarketSnapshot(TRADING_PAIR);
       console.log(
         `[agent] ${TRADING_PAIR} @ $${market.price.toLocaleString()} | ` +
-        `vol ${market.volume.toFixed(4)} BTC (Kraken) | ` +
-        `${market.recentVolumes?.length ?? 0} candles loaded`
+        `vol ${market.volume.toFixed(4)} BTC | ` +
+        `${market.recentVolumes?.length ?? 0} candles | ` +
+        `CB: ${strategy.isCircuitBreakerTripped() ? "🔴 TRIPPED" : "🟢 OK"}`
       );
 
       // 2. Strategy decision
-      //    strategy.ts reads market.recentVolumes (Kraken) for spike detection
-      const decision = await strategy.analyze(market);
+      const decision = await strategy.analyze(market) as TradeDecision & Record<string, unknown>;
 
-      // 3. Human-readable explanation
+      // 3. Log trade close with PnL if this is a SELL
+      logTradeOutcome(decision);
+
+      // 4. Always persist current stats (so dashboard always has fresh numbers)
+      const currentStats = strategy.getStats();
+      persistStats(currentStats);
+      console.log(
+        `[agent] Stats → trades=${currentStats.totalTrades} | ` +
+        `wins=${currentStats.wins} | ` +
+        `winRate=${(currentStats.winRate * 100).toFixed(1)}% | ` +
+        `totalPnL=$${currentStats.totalPnlUsd.toFixed(2)} | ` +
+        `avgROI=${currentStats.avgRoiPct.toFixed(3)}%`
+      );
+
+      // 5. Human-readable explanation
       const explanation = formatExplanation(decision, market);
       console.log(explanation);
 
       let intentHash = HOLD_INTENT_HASH;
 
-      // 4. Actionable trade → submit to RiskRouter (strict guardrails apply here)
+      // 6. Actionable trade → RiskRouter
       if (decision.action !== "HOLD" && decision.amount > 0) {
         const intent = await riskRouter.buildIntent(
           agentId,
@@ -184,15 +221,16 @@ export async function runAgent(strategy: TradingStrategy) {
           decision.reasoning += ` [BLOCKED by RiskRouter: ${validation_result.reason}]`;
         } else {
           const volumeBase = (decision.amount / market.price).toFixed(8);
-          console.log(`[agent] PAPER TRADE EXECUTED`);
+          console.log(`[agent] ✅ PAPER TRADE EXECUTED`);
           console.log(`[agent] ${decision.action} ${volumeBase} ${decision.pair} @ $${market.price}`);
 
+          // Keep isInPosition in sync with confirmed executions
           if (decision.action === "BUY")  isInPosition = true;
           if (decision.action === "SELL") isInPosition = false;
         }
       }
 
-      // 5. Generate EIP-712 signed checkpoint
+      // 7. EIP-712 checkpoint
       const checkpoint = await generateCheckpoint(
         agentId,
         decision,
@@ -205,22 +243,28 @@ export async function runAgent(strategy: TradingStrategy) {
 
       console.log(formatCheckpointLog(checkpoint));
 
-      // 6. Post to ValidationRegistry if decision clears the reputation gate
+      // 8. Post to ValidationRegistry
       const cp = checkpoint as typeof checkpoint & { checkpointHash?: string };
       if (cp.checkpointHash) {
         if (shouldPostCheckpoint(decision, isInPosition)) {
           try {
             const score = computeCheckpointScore(decision);
+
+            // Attach PnL metadata to the attestation label when closing a trade
+            const pnlTag = decision.action === "SELL" && decision["pnl"] != null
+              ? ` | PnL=$${(decision["pnl"] as number).toFixed(2)} ROI=${(decision["roiPct"] as number).toFixed(3)}%`
+              : "";
+
             await validation.postCheckpointAttestation(
               agentId,
               cp.checkpointHash,
               score,
-              `${decision.action} ${decision.pair} @ $${market.price}`
+              `${decision.action} ${decision.pair} @ $${market.price}${pnlTag}`
             );
             console.log(`[agent] ✓ Checkpoint posted (score=${score}): ${cp.checkpointHash.slice(0, 20)}...`);
           } catch (e: any) {
             if (e?.reason?.includes("not an authorized validator")) {
-              return; // Judge Bot handles registry posting — skip silently
+              return;
             }
             console.warn(`[agent] ValidationRegistry post failed (non-fatal):`, e);
           }
@@ -228,12 +272,12 @@ export async function runAgent(strategy: TradingStrategy) {
           console.log(
             `[agent] ⏭ Checkpoint skipped (warm-up or confidence=${(
               decision.confidence * 100
-            ).toFixed(0)}% below ${MIN_CHECKPOINT_CONFIDENCE * 100}% threshold)`
+            ).toFixed(0)}% below ${MIN_CHECKPOINT_CONFIDENCE * 100}%)`
           );
         }
       }
 
-      // 7. Always persist locally regardless of on-chain posting
+      // 9. Always persist checkpoint locally
       fs.appendFileSync(CHECKPOINTS_FILE, JSON.stringify(checkpoint) + "\n");
 
     } catch (err) {
@@ -248,9 +292,7 @@ export async function runAgent(strategy: TradingStrategy) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────────────────────────────────────
-
 const strategy = new VolumeConfirmedMomentumStrategy();
-// const strategy = new LLMStrategy();
 
 runAgent(strategy).catch((err) => {
   console.error("[agent] Fatal error:", err);
